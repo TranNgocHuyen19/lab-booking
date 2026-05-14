@@ -1,0 +1,97 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME}
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
+    show-sql: ${SPRING_JPA_SHOW_SQL}
+    properties:
+      hibernate:
+        dialect: ${SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT}
+        enable_lazy_load_no_trans: ${SPRING_JPA_PROPERTIES_HIBERNATE_ENABLE_LAZY_LOAD_NO_TRANS}
+        format_sql: true
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT}
+
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_MULTIPART_MAX_FILE_SIZE}
+      max-request-size: ${SPRING_MULTIPART_MAX_REQUEST_SIZE}
+
+file:
+  upload-dir: ${FILE_UPLOAD_DIR}
+  public-base-url: ${FILE_PUBLIC_BASE_URL}
+
+brevo:
+  api-key: ${BREVO_API_KEY}
+  sender-name: Lab Booking IUH
+  sender-email: ${BREVO_SENDER_EMAIL}
+
+server:
+  port: ${SERVER_PORT}
+  servlet:
+    context-path: ${SERVER_SERVLET_CONTEXT_PATH}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+openapi:
+  service:
+    api-docs: lab-booking
+    server: ${OPENAPI_SERVER_URL}
+    title: Lab Booking Backend Service
+    version: 1.0.0
+
+logging:
+  level:
+    org.springframework: INFO
+    com.student.company.insurance_service: DEBUG
+    org.springframework.ai.chat.memory: DEBUG
+    org.springframework.ai.chat.client: DEBUG
+    com.student.company.insurance_service.service.aichat: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+jwt:
+  access:
+    secret: ${JWT_ACCESS_SECRET}
+    expiration: ${JWT_ACCESS_EXPIRATION}
+  refresh:
+    secret: ${JWT_REFRESH_SECRET}
+    expiration: ${JWT_REFRESH_EXPIRATION}
+  issuer: ${JWT_ISSUER}
+
+app:
+  cookie:
+    secure: ${APP_COOKIE_SECURE:false}
+    same-site: ${APP_COOKIE_SAME_SITE:Lax}
+
+init:
+  enabled: ${INIT_ENABLED}
+  admin:
+    username: ${INIT_ADMIN_USERNAME}
+    email: ${INIT_ADMIN_EMAIL}
+    fullName: ${INIT_ADMIN_FULLNAME}
+  lecturer:
+    username: ${INIT_LECTURER_USERNAME}
+    email: ${INIT_LECTURER_EMAIL}
+    password: ${INIT_LECTURER_PASSWORD}
+    fullName: ${INIT_LECTURER_FULLNAME}
+  student:
+    username: ${INIT_STUDENT_USERNAME}
+    email: ${INIT_STUDENT_EMAIL}
+    password: ${INIT_STUDENT_PASSWORD}
+    fullName: ${INIT_STUDENT_FULLNAME}
