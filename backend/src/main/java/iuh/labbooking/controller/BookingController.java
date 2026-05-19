@@ -36,7 +36,7 @@ public class BookingController {
     @Operation(summary = "Create booking request")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest request) {
-        BookingResponse response = bookingService.createBooking(request);
+        BookingResponse response = bookingService.createBookingV2(request);
         return ResponseEntity.ok(ApiResponse.success("Booking created successfully", response));
     }
 

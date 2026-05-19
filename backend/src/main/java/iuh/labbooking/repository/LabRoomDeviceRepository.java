@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface LabRoomDeviceRepository extends JpaRepository<LabRoomDevice, Long> {
@@ -22,8 +23,10 @@ public interface LabRoomDeviceRepository extends JpaRepository<LabRoomDevice, Lo
                 AND lrd.device.deviceId IN :deviceIds
                 ORDER BY lrd.device.deviceId ASC
             """)
-    List<LabRoomDevice> findAllWithLock(@Param("labRoomId") Long labRoomId,
+    List<LabRoomDevice> findByLabRoomIdAndDeviceIdsWithLock(@Param("labRoomId") Long labRoomId,
             @Param("deviceIds") List<Long> deviceIds);
 
     boolean existsByLabRoom_LabRoomIdAndDevice_DeviceId(Long labRoomId, Long deviceId);
+
+    Optional<LabRoomDevice> findByLabRoom_LabRoomIdAndDevice_DeviceId(Long labRoomId, Long deviceId);
 }

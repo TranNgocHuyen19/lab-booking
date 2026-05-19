@@ -21,7 +21,7 @@ public interface LabRoomRepository extends JpaRepository<LabRoom, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints({ @QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000") })
     @Query("SELECT lr FROM LabRoom lr WHERE lr.labRoomId = :id")
-    Optional<LabRoom> findByIdWithLock(@Param("id") Long id);
+    Optional<LabRoom> findByLabRoomIdForUpdate(@Param("id") Long id);
 
     Optional<LabRoom> findByRoomName(String roomName);
 

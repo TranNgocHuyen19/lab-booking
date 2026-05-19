@@ -145,6 +145,14 @@ public enum ErrorCode {
     BOOKING_TIME_PASSED_CANNOT_APPROVE(2625, "Cannot approve booking as the scheduled time has already passed", HttpStatus.BAD_REQUEST),
     LATE_CANCELLATION_NOT_ALLOWED(2626, "Cannot cancel booking: Cancellation window has closed", HttpStatus.BAD_REQUEST),
     BOOKING_CREATION_TIME_INVALID(2627, "Invalid booking time: Booking window has closed", HttpStatus.BAD_REQUEST),
+    BOOKING_VALIDATION_FAILED(2628, "Booking validation failed", HttpStatus.BAD_REQUEST),
+    UNSUPPORTED_BOOKING_TYPE(2629, "Unsupported booking type", HttpStatus.BAD_REQUEST),
+    PERSONAL_BOOKING_DUPLICATED(2630, "User already has an active personal booking in the same date and slot", HttpStatus.CONFLICT),
+    USER_CONFIRMED_IN_GROUP_BOOKING(2631, "User is already confirmed in a group booking in the same date and slot", HttpStatus.CONFLICT),
+    GROUP_REQUIRES_ONE_RESEARCH_GROUP(2632, "MVP group booking must be linked to exactly one research group", HttpStatus.BAD_REQUEST),
+    RESEARCH_GROUP_HAS_ACTIVE_BOOKING(2633, "Research group already has an active group booking in the same date and slot", HttpStatus.CONFLICT),
+    ROOM_HAS_THESIS_BOOKING(2634, "Room already has an active thesis booking in the same date and slot", HttpStatus.CONFLICT),
+    USER_HAS_PENDING_GROUP_INVITATION(2635, "User has a pending group invitation or conflict-resolution booking in the same date and slot", HttpStatus.OK),
 
     // ==================== ENTITY: ATTENDANCE (2700-2799) ====================
     ATTENDANCE_NOT_FOUND(2700, "Attendance record not found", HttpStatus.NOT_FOUND),

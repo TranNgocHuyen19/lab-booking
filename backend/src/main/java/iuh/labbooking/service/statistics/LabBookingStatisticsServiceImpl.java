@@ -1,11 +1,10 @@
-package iuh.labbooking.service.statistics.impl;
+package iuh.labbooking.service.statistics;
 
 import iuh.labbooking.dto.response.base.PageResponse;
 import iuh.labbooking.dto.response.statistics.*;
 import iuh.labbooking.enums.RequestStatus;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.repository.BookingRequestRepository;
-import iuh.labbooking.service.statistics.LabBookingStatisticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

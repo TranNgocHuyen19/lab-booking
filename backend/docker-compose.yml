@@ -1,6 +1,90 @@
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lab_booking_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/labbooking
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: lab_booking_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-labbooking}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - lab_booking_pgdata:/var/lib/postgresql/data
+      - ./src/main/resources/db/booking_sample_data.sql:/docker-entrypoint-initdb.d/10_booking_sample_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d labbooking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   redis:
-    image: "redis:8.4.0"
-    container_name: "lab_booking_redis"
+    image: redis:8.4.0
+    container_name: lab_booking_redis
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
+    volumes:
+      - lab_booking_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: lab_booking_pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-123123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - lab_booking_pgadmin:/var/lib/pgadmin
+    restart: unless-stopped
+
+  redisinsight:
+    image: redis/redisinsight:2.68
+    container_name: lab_booking_redisinsight
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5540:5540"
+    volumes:
+      - lab_booking_redisinsight:/data
+    restart: unless-stopped
+
+volumes:
+  lab_booking_pgdata:
+  lab_booking_redisdata:
+  lab_booking_pgadmin:
+  lab_booking_redisinsight:

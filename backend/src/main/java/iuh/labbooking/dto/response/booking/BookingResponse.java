@@ -37,5 +37,8 @@ public record BookingResponse(
         UserSummaryResponse responseBy,
         List<Long> researchGroupIds,
         Boolean isAllowedEditing,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        List<BookingParticipantResponse> participants,
+        List<BookingWarning> warnings,
+        List<ParticipantConflictResponse> participantConflicts) {
 }

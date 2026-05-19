@@ -3,6 +3,7 @@ package iuh.labbooking.repository;
 import iuh.labbooking.dto.response.participant.ParticipantResponse;
 import iuh.labbooking.dto.response.participant.SecureParticipantResponse;
 import iuh.labbooking.enums.ParticipantStatus;
+import iuh.labbooking.enums.RequestStatus;
 import iuh.labbooking.model.BookingParticipant;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.User;
@@ -140,4 +141,61 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         @Param("bookingId") Long bookingId,
                         @Param("search") String search,
                         Pageable pageable);
+
+        @Query("""
+                        SELECT COUNT(bp) > 0
+                        FROM BookingParticipant bp
+                        JOIN bp.bookingRequest br
+                        JOIN br.slotBookings sb
+                        WHERE bp.user.userId = :userId
+                          AND br.bookingType = 'PERSONAL'
+                          AND br.status IN :activeStatuses
+                          AND bp.status IN :participantStatuses
+                          AND sb.bookingDate = :bookingDate
+                          AND sb.slot.slotId IN :slotIds
+                        """)
+        boolean existsPersonalBookingForUser(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("participantStatuses") List<ParticipantStatus> participantStatuses);
+
+        @Query("""
+                        SELECT COUNT(bp) > 0
+                        FROM BookingParticipant bp
+                        JOIN bp.bookingRequest br
+                        JOIN br.slotBookings sb
+                        WHERE bp.user.userId = :userId
+                          AND br.bookingType = 'GROUP'
+                          AND br.status IN :activeStatuses
+                          AND bp.status = :participantStatus
+                          AND sb.bookingDate = :bookingDate
+                          AND sb.slot.slotId IN :slotIds
+                        """)
+        boolean existsGroupBookingForUserByParticipantStatus(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("participantStatus") ParticipantStatus participantStatus);
+
+        @Query("""
+                        SELECT DISTINCT bp
+                        FROM BookingParticipant bp
+                        JOIN FETCH bp.bookingRequest br
+                        JOIN br.slotBookings sb
+                        WHERE bp.user.userId = :userId
+                          AND br.bookingType = 'GROUP'
+                          AND br.status IN :activeStatuses
+                          AND bp.status IN :participantStatuses
+                          AND sb.bookingDate = :bookingDate
+                          AND sb.slot.slotId IN :slotIds
+                        """)
+        List<BookingParticipant> findGroupParticipantsForUserByStatuses(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("participantStatuses") List<ParticipantStatus> participantStatuses);
 }

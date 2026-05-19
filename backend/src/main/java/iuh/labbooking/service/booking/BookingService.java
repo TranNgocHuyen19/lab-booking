@@ -20,7 +20,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface BookingService {
-        BookingResponse createBooking(CreateBookingRequest request);
+        BookingResponse createBookingV2(CreateBookingRequest request);
 
         BookingResponse updateBooking(Long id, UpdateBookingRequest request);
 

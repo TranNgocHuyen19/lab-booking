@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -92,6 +93,40 @@ public interface BookingRequestRepository
 
         @Query("SELECT b.createdAt, b.modifiedAt FROM BookingRequest b WHERE b.createdAt >= :start AND b.createdAt <= :end AND (b.status = 'APPROVED' OR b.status = 'REJECTED') AND b.modifiedAt IS NOT NULL")
         List<Object[]> findProcessingTimes(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
+        @Query("""
+                SELECT COUNT(DISTINCT br) > 0
+                FROM BookingRequest br
+                JOIN br.researchGroup rg
+                JOIN br.slotBookings sb
+                WHERE rg.researchGroupId = :researchGroupId
+                  AND br.bookingType = 'GROUP'
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        boolean existsActiveGroupBookingForResearchGroup(
+                        @Param("researchGroupId") Long researchGroupId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.slotBookings sb
+                WHERE br.labRoom.labRoomId = :labRoomId
+                  AND br.bookingType IN :bookingTypes
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        List<BookingRequest> findActiveBookingsByRoomDateSlotsAndTypes(
+                        @Param("labRoomId") Long labRoomId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("bookingTypes") List<BookingType> bookingTypes,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
 }
 
 

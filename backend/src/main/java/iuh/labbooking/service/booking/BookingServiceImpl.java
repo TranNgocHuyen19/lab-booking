@@ -4,6 +4,7 @@ import iuh.labbooking.dto.DeviceReservationDto;
 import iuh.labbooking.dto.request.booking.AddParticipantRequest;
 import iuh.labbooking.dto.request.booking.BookingStatusRequest;
 import iuh.labbooking.dto.request.booking.CancelBookingRequest;
+import iuh.labbooking.dto.request.booking.CreateBookingDevice;
 import iuh.labbooking.dto.request.booking.CreateBookingRequest;
 import iuh.labbooking.dto.request.booking.UpdateBookingRequest;
 
@@ -18,10 +19,14 @@ import iuh.labbooking.enums.*;
 import iuh.labbooking.exception.AppException;
 import iuh.labbooking.exception.ErrorCode;
 import iuh.labbooking.mapper.BookingMapper;
+import iuh.labbooking.mapper.booking.BookingCreationResponseMapper;
 import iuh.labbooking.mapper.BookingStatusHistoryMapper;
 import iuh.labbooking.mapper.UserMapper;
 import iuh.labbooking.model.*;
 import iuh.labbooking.repository.*;
+import iuh.labbooking.service.booking.strategy.BookingCreationStrategy;
+import iuh.labbooking.service.booking.strategy.BookingStrategyFactory;
+import iuh.labbooking.service.booking.validation.BookingValidationResult;
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
 import iuh.labbooking.service.researchgroup.ResearchGroupService;
 import iuh.labbooking.service.user.UserService;
@@ -66,73 +71,44 @@ public class BookingServiceImpl implements BookingService {
     private final BookingStatusHistoryMapper bookingStatusHistoryMapper;
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final BookingStrategyFactory bookingStrategyFactory;
+    private final BookingCreationResponseMapper bookingCreationResponseMapper;
 
 
     @Transactional
     @Override
-    public BookingResponse createBooking(CreateBookingRequest request) {
-        User currentUser = securityUtil.getCurrentUser();
+    public BookingResponse createBookingV2(CreateBookingRequest request) {
+        Long currentUserId = securityUtil.getCurrentUserId();
+        BookingCreationContext context = new BookingCreationContext(request, currentUserId);
 
-        LabRoom labRoom = labRoomRepository.findByIdWithLock(request.labRoomId())
+        lockResourcesForCreationV2(context);
+
+        BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(context.bookingType());
+        BookingValidationResult validationResult = strategy.validate(context);
+        if (validationResult.hasErrors()) {
+            throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
+        }
+
+        BookingRequest bookingRequest = strategy.create(context, validationResult);
+        strategy.afterCreated(bookingRequest, context);
+
+        // TODO: Publish booking notification event after transaction commit.
+
+        return bookingCreationResponseMapper.toResponse(bookingRequest, validationResult);
+    }
+
+    private void lockResourcesForCreationV2(BookingCreationContext context) {
+        labRoomRepository.findByLabRoomIdForUpdate(context.labRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.LAB_ROOM_NOT_FOUND));
 
-        if (request.devices() != null && !request.devices().isEmpty()) {
-            List<Long> deviceIds = request.devices().stream()
-                    .map(DeviceQuantityRequest::deviceId)
-                    .sorted()
-                    .toList();
-            labRoomDeviceRepository.findAllWithLock(request.labRoomId(), deviceIds);
+        if (!context.devices().isEmpty()) {
+            labRoomDeviceRepository.findByLabRoomIdAndDeviceIdsWithLock(
+                    context.labRoomId(),
+                    context.devices().stream()
+                            .map(CreateBookingDevice::deviceId)
+                            .sorted()
+                            .toList());
         }
-
-        List<Slot> slots = slotRepository.findAllById(request.slotIds());
-        if (slots.size() != request.slotIds().size())
-            throw new AppException(ErrorCode.SLOT_NOT_FOUND);
-
-        BookingSystemConfig bookingConfig = configService.createBookingSnapshot();
-
-        validateBookingRequest(request, labRoom, slots, currentUser, bookingConfig);
-
-        if (request.bookingType() == BookingType.THESIS) {
-            overrideConflictingBookings(labRoom, request.bookingDate(), request.slotIds());
-        }
-
-        BookingRequest bookingRequest = BookingRequest.builder()
-                .purpose(request.purpose())
-                .bookingType(request.bookingType())
-                .status(RequestStatus.PENDING)
-                .requester(currentUser)
-                .labRoom(labRoom)
-                .researchGroup(researchGroupService.findEntitiesByIds(request.researchGroupIds()))
-                .bookingSystemConfig(bookingConfig)
-                .build();
-
-        bookingRequest.setSlotBookings(slots.stream()
-                .map(slot -> SlotBooking.builder()
-                        .bookingRequest(bookingRequest).slot(slot).name(request.purpose())
-                        .bookingDate(request.bookingDate()).startTime(slot.getStartTime()).endTime(slot.getEndTime())
-                        .build())
-                .collect(Collectors.toSet()));
-
-        List<AddParticipantRequest> normalized = normalizeParticipants(request.bookingType(), request.participants(),
-                currentUser);
-
-        bookingRequest.setParticipants(new HashSet<>(mapToParticipants(bookingRequest, normalized)));
-
-        if (request.devices() != null && !request.devices().isEmpty()) {
-            bookingRequest.setBookingDevices(new HashSet<>(mapToBookingDevices(bookingRequest, request.devices())));
-        }
-
-        BookingRequest saved = bookingRequestRepository.save(bookingRequest);
-        log.info("Booking created: ID={}", saved.getBookingRequestId());
-
-        saveBookingStatusHistory(saved, null, RequestStatus.PENDING, StatusChangeReason.NEW_REQUEST, saved.getPurpose(), null);
-
-        if (request.bookingType() == BookingType.THESIS) {
-            log.info("Auto-approving THESIS booking: ID={}", saved.getBookingRequestId());
-            approveBooking(saved.getBookingRequestId(), null);
-        }
-
-        return buildBookingResponse(saved, currentUser);
     }
 
     @Transactional
@@ -149,7 +125,7 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_NOT_FOUND, "Đơn đặt không có thông tin ca học");
         }
 
-        LabRoom labRoom = labRoomRepository.findByIdWithLock(booking.getLabRoom().getLabRoomId())
+        LabRoom labRoom = labRoomRepository.findByLabRoomIdForUpdate(booking.getLabRoom().getLabRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.LAB_ROOM_NOT_FOUND));
 
         if (request.devices() != null && !request.devices().isEmpty()) {
@@ -157,7 +133,7 @@ public class BookingServiceImpl implements BookingService {
                     .map(DeviceQuantityRequest::deviceId)
                     .sorted()
                     .toList();
-            labRoomDeviceRepository.findAllWithLock(labRoom.getLabRoomId(), deviceIds);
+            labRoomDeviceRepository.findByLabRoomIdAndDeviceIdsWithLock(labRoom.getLabRoomId(), deviceIds);
         }
 
         LocalDate bookingDate = booking.getSlotBookings().iterator().next().getBookingDate();
@@ -190,28 +166,6 @@ public class BookingServiceImpl implements BookingService {
 
         BookingRequest updatedBooking = bookingRequestRepository.save(booking);
         return buildBookingResponse(updatedBooking, securityUtil.getCurrentUser());
-    }
-
-    private void validateBookingRequest(CreateBookingRequest request, LabRoom labRoom, List<Slot> slots, User user, BookingSystemConfig bookingConfig) {
-        if (request.bookingDate().isBefore(LocalDate.now()))
-            throw new AppException(ErrorCode.BOOKING_PAST_DATE);
-
-        validateBookingAdvanceDate(request.bookingDate(), user, bookingConfig);
-
-        if (!securityUtil.isAdmin()) {
-            validateBookingTimeWindow(request.bookingDate(), slots, user, bookingConfig);
-        }
-
-        if (request.bookingType() == BookingType.THESIS && !securityUtil.isAdmin() && !securityUtil.isLecturer()) {
-            throw new AppException(ErrorCode.THESIS_BOOKING_NOT_ALLOWED);
-        }
-
-        List<AddParticipantRequest> normalized = normalizeParticipants(request.bookingType(), request.participants(),
-                user);
-        validateNoDuplicateBookings(normalized, request.bookingDate(), request.slotIds(), null, request.force());
-        validateSlotsAvailability(labRoom, slots, request.bookingDate(), request.bookingType(), normalized.size());
-        validateInventory(labRoom, request.bookingDate(), request.slotIds(), request.devices(),
-                null);
     }
 
     private void validateBookingAdvanceDate(LocalDate bookingDate, User user, BookingSystemConfig config) {
