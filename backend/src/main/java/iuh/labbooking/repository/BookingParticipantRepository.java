@@ -25,11 +25,14 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                             SELECT bp.bookingRequest.bookingRequestId, COUNT(bp)
                             FROM BookingParticipant bp
                             WHERE bp.bookingRequest.bookingRequestId IN :requestIds
-                            AND bp.status = 'ACTIVE'
-                            AND bp.bookingRequest.status IN ('PENDING', 'APPROVED')
+                            AND bp.status IN :participantStatuses
+                            AND bp.bookingRequest.status IN :activeStatuses
                             GROUP BY bp.bookingRequest.bookingRequestId
                         """)
-        List<Object[]> countParticipantsByBookingRequestIds(@Param("requestIds") Set<Long> requestIds);
+        List<Object[]> countParticipantsByBookingRequestIds(
+                        @Param("requestIds") Set<Long> requestIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("participantStatuses") List<ParticipantStatus> participantStatuses);
 
         List<BookingParticipant> findByBookingRequest(BookingRequest bookingRequest);
 
@@ -196,6 +199,25 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         @Param("userId") Long userId,
                         @Param("bookingDate") LocalDate bookingDate,
                         @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("participantStatuses") List<ParticipantStatus> participantStatuses);
+
+        @Query("""
+                        SELECT COUNT(bp)
+                        FROM BookingParticipant bp
+                        JOIN bp.bookingRequest br
+                        JOIN br.slotBookings sb
+                        WHERE br.labRoom.labRoomId = :labRoomId
+                          AND br.bookingType <> 'THESIS'
+                          AND br.status IN :activeStatuses
+                          AND bp.status IN :participantStatuses
+                          AND sb.bookingDate = :bookingDate
+                          AND sb.slot.slotId = :slotId
+                        """)
+        long countOccupiedSeats(
+                        @Param("labRoomId") Long labRoomId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotId") Long slotId,
                         @Param("activeStatuses") List<RequestStatus> activeStatuses,
                         @Param("participantStatuses") List<ParticipantStatus> participantStatuses);
 }

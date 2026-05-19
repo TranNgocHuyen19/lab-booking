@@ -56,6 +56,11 @@ public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
     @Override
     public BookingValidationResult validate(BookingCreationContext context) {
         BookingValidationResult result = BookingValidationResult.ok();
+        validateRequestShape(context, result);
+        if (result.hasErrors()) {
+            return result;
+        }
+
         if (conflictQueryService.roomHasActiveThesisBooking(context.labRoomId(), primaryDate(context), slotIds(context))) {
             result.addError(ErrorCode.ROOM_HAS_THESIS_BOOKING);
         }

@@ -57,12 +57,21 @@ public class GroupBookingStrategy extends AbstractBookingCreationStrategy {
     @Override
     public BookingValidationResult validate(BookingCreationContext context) {
         BookingValidationResult result = BookingValidationResult.ok();
+        validateRequestShape(context, result);
+        if (result.hasErrors()) {
+            return result;
+        }
+
         var date = primaryDate(context);
         var slotIds = slotIds(context);
 
         if (context.researchGroupIds().size() != 1) {
             result.addError(ErrorCode.GROUP_REQUIRES_ONE_RESEARCH_GROUP);
             return result;
+        }
+
+        if (context.participants().isEmpty()) {
+            result.addError(ErrorCode.BOOKING_NO_PARTICIPANTS);
         }
 
         Long researchGroupId = context.researchGroupIds().iterator().next();
@@ -86,6 +95,7 @@ public class GroupBookingStrategy extends AbstractBookingCreationStrategy {
         });
 
         validateDevices(context, result);
+        validateCapacity(context, result, conflictQueryService, context.participants().size());
         return result;
     }
 

@@ -5,6 +5,7 @@ import iuh.labbooking.dto.response.schedule.RoomScheduleResponse;
 import iuh.labbooking.dto.response.schedule.SlotScheduleResponse;
 import iuh.labbooking.dto.response.schedule.WeekScheduleResponse;
 import iuh.labbooking.enums.BookingType;
+import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.enums.RequestStatus;
 import iuh.labbooking.mapper.LabRoomMapper;
 import iuh.labbooking.model.LabRoom;
@@ -27,6 +28,17 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class LabRoomScheduleServiceImpl implements LabRoomScheduleService {
+    private static final List<RequestStatus> ACTIVE_BOOKING_STATUSES = List.of(
+            RequestStatus.PENDING,
+            RequestStatus.APPROVED
+    );
+
+    private static final List<ParticipantStatus> OCCUPYING_PARTICIPANT_STATUSES = List.of(
+            ParticipantStatus.ACTIVE,
+            ParticipantStatus.CONFIRMED,
+            ParticipantStatus.INVITED,
+            ParticipantStatus.PENDING_CONFLICT_RESOLUTION
+    );
 
     private final LabRoomRepository labRoomRepository;
     private final SlotRepository slotRepository;
@@ -61,7 +73,10 @@ public class LabRoomScheduleServiceImpl implements LabRoomScheduleService {
         Map<Long, Integer> participantCountMap = new HashMap<>();
         if (!bookingRequestIds.isEmpty()) {
             List<Object[]> participantCounts = bookingParticipantRepository
-                    .countParticipantsByBookingRequestIds(bookingRequestIds);
+                    .countParticipantsByBookingRequestIds(
+                            bookingRequestIds,
+                            ACTIVE_BOOKING_STATUSES,
+                            OCCUPYING_PARTICIPANT_STATUSES);
             participantCountMap = participantCounts.stream()
                     .collect(Collectors.toMap(
                             row -> (Long) row[0],

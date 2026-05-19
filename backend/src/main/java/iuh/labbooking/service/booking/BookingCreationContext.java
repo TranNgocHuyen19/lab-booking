@@ -7,7 +7,9 @@ import iuh.labbooking.dto.request.booking.CreateBookingSlot;
 import iuh.labbooking.enums.BookingType;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public record BookingCreationContext(
@@ -39,7 +41,17 @@ public record BookingCreationContext(
     }
 
     public List<CreateBookingDevice> devices() {
-        return request.devices() == null ? List.of() : request.devices();
+        if (request.devices() == null || request.devices().isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Integer> quantityByDeviceId = new LinkedHashMap<>();
+        request.devices().forEach(device ->
+                quantityByDeviceId.merge(device.deviceId(), device.quantity(), Integer::sum));
+
+        return quantityByDeviceId.entrySet().stream()
+                .map(entry -> new CreateBookingDevice(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     public LocalDate primaryDate() {
@@ -49,6 +61,16 @@ public record BookingCreationContext(
     public List<Long> slotIds() {
         return slots().stream()
                 .map(CreateBookingSlot::slotId)
+                .toList();
+    }
+
+    public boolean hasDuplicatedSlots() {
+        return slots().size() != new java.util.HashSet<>(slotKeys()).size();
+    }
+
+    private List<String> slotKeys() {
+        return slots().stream()
+                .map(slot -> slot.bookingDate() + "#" + slot.slotId())
                 .toList();
     }
 }

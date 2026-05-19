@@ -55,6 +55,11 @@ public class PersonalBookingStrategy extends AbstractBookingCreationStrategy {
     @Override
     public BookingValidationResult validate(BookingCreationContext context) {
         BookingValidationResult result = BookingValidationResult.ok();
+        validateRequestShape(context, result);
+        if (result.hasErrors()) {
+            return result;
+        }
+
         var date = primaryDate(context);
         var slotIds = slotIds(context);
 
@@ -75,6 +80,7 @@ public class PersonalBookingStrategy extends AbstractBookingCreationStrategy {
         }
 
         validateDevices(context, result);
+        validateCapacity(context, result, conflictQueryService, 1);
         return result;
     }
 

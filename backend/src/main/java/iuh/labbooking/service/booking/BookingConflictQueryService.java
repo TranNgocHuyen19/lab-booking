@@ -22,6 +22,13 @@ public class BookingConflictQueryService {
             RequestStatus.APPROVED
     );
 
+    public static final List<ParticipantStatus> OCCUPYING_PARTICIPANT_STATUSES = List.of(
+            ParticipantStatus.ACTIVE,
+            ParticipantStatus.CONFIRMED,
+            ParticipantStatus.INVITED,
+            ParticipantStatus.PENDING_CONFLICT_RESOLUTION
+    );
+
     private final BookingParticipantRepository bookingParticipantRepository;
     private final BookingRequestRepository bookingRequestRepository;
 
@@ -76,5 +83,14 @@ public class BookingConflictQueryService {
                 slotIds,
                 List.of(BookingType.PERSONAL, BookingType.GROUP),
                 ACTIVE_BOOKING_STATUSES);
+    }
+
+    public long countOccupiedSeats(Long labRoomId, LocalDate date, Long slotId) {
+        return bookingParticipantRepository.countOccupiedSeats(
+                labRoomId,
+                date,
+                slotId,
+                ACTIVE_BOOKING_STATUSES,
+                OCCUPYING_PARTICIPANT_STATUSES);
     }
 }
