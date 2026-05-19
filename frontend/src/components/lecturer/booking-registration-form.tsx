@@ -24,11 +24,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { QUERY_KEYS } from '@/query-core'
+import { DuplicateConfirmDialog } from '@/components/common/duplicate-confirm-dialog'
 import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { MemberInfoResponse, SecureResearchGroupResponse } from '@/schemas/research-group.schema'
 import type { SlotResponse } from '@/schemas/slot.schema'
 import type { UserResponse } from '@/schemas/user.schema'
 import { handleBookingCreateError, showBookingCreateFeedback } from '@/utils/booking-create-feedback'
+import type { BookingCreateWarningDialog } from '@/utils/booking-create-feedback'
 
 interface LecturerBookingFormProps {
   selection: { roomId: number; date: string; slotIds: number[] }
@@ -55,6 +58,13 @@ export const LecturerBookingForm = ({
   const [purpose, setPurpose] = useState<string>('')
   const [deviceQuantities, setDeviceQuantities] = useState<Record<number, number>>({})
   const [showMembers, setShowMembers] = useState<boolean>(false)
+  const [warningDialog, setWarningDialog] = useState<BookingCreateWarningDialog | null>(null)
+
+  const finishBookingCreation = () => {
+    setWarningDialog(null)
+    onSuccess()
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT })
+  }
 
   const { data: devicesAvailabilityRes, isLoading: isLoadingDevicesAvailability } = useDeviceAvailabilityQuery({
     labRoomId: selection.roomId,
@@ -145,9 +155,12 @@ export const LecturerBookingForm = ({
       }
 
       const response = await createBookingMutation.mutateAsync(payload)
-      showBookingCreateFeedback(response)
-      onSuccess()
-      queryClient.invalidateQueries({ queryKey: ['labRooms', 'schedule'] })
+      const dialog = showBookingCreateFeedback(response)
+      if (dialog) {
+        setWarningDialog(dialog)
+        return
+      }
+      finishBookingCreation()
     } catch (error: unknown) {
       handleBookingCreateError(error)
     }
@@ -489,6 +502,20 @@ export const LecturerBookingForm = ({
           </div>
         </div>
       </div>
+      {warningDialog && (
+        <DuplicateConfirmDialog
+          open={!!warningDialog}
+          onOpenChange={(open) => {
+            if (!open) finishBookingCreation()
+          }}
+          conflictDetails={warningDialog.conflictDetails}
+          title={warningDialog.title}
+          description={warningDialog.description}
+          note={warningDialog.note}
+          confirmLabel={warningDialog.confirmLabel}
+          showCancel={false}
+        />
+      )}
     </>
   )
 }

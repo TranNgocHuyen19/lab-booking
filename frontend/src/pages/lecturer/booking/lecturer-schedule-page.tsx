@@ -268,7 +268,7 @@ const LecturerSchedulePage = () => {
                     isLecturerView={true}
                     onRefresh={() => {
                       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.MY_GROUPS })
-                      queryClient.invalidateQueries({ queryKey: ['lab-schedule'] })
+                      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT })
                     }}
                   />
                 ) : (

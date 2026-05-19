@@ -133,6 +133,7 @@ export const ERROR_MESSAGES: Record<number | string, string> = {
   '2633': 'Nhom nghien cuu da co booking dang hoat dong trong cung ngay va ca',
   '2634': 'Phong da co booking thesis trong cung ngay va ca',
   '2635': 'Ban dang co loi moi nhom hoac booking nhom can xu ly trong cung ngay va ca',
+  '2636': 'Danh sach ca dat phong bi trung ngay va ca',
 
   // ==================== ENTITY: ATTENDANCE (2700-2799) ====================
   '2700': 'Không tìm thấy bản ghi điểm danh',
