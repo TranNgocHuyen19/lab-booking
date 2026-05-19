@@ -125,6 +125,14 @@ export const ERROR_MESSAGES: Record<number | string, string> = {
   '2625': 'Hết hạn duyệt đơn',
   '2626': 'Hết hạn hủy đơn',
   '2627': 'Hết hạn đặt phòng cho vai trò của bạn',
+  '2628': 'Du lieu dang ky phong khong hop le',
+  '2629': 'Loai booking khong duoc ho tro',
+  '2630': 'Ban da co booking ca nhan trong cung ngay va ca',
+  '2631': 'Ban da xac nhan tham gia booking nhom trong cung ngay va ca',
+  '2632': 'Booking nhom phai gan dung mot nhom nghien cuu',
+  '2633': 'Nhom nghien cuu da co booking dang hoat dong trong cung ngay va ca',
+  '2634': 'Phong da co booking thesis trong cung ngay va ca',
+  '2635': 'Ban dang co loi moi nhom hoac booking nhom can xu ly trong cung ngay va ca',
 
   // ==================== ENTITY: ATTENDANCE (2700-2799) ====================
   '2700': 'Không tìm thấy bản ghi điểm danh',

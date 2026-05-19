@@ -18,6 +18,16 @@ export const AddParticipantRequestSchema = z.object({
   role: ParticipantRoleSchema
 })
 
+export const CreateBookingParticipantSchema = z.object({
+  userId: z.number(),
+  role: ParticipantRoleSchema
+})
+
+export const CreateBookingSlotSchema = z.object({
+  slotId: z.number(),
+  bookingDate: z.string()
+})
+
 export const DeviceQuantityRequestSchema = z.object({
   deviceId: z.number(),
   quantity: z.number().min(1)
@@ -25,20 +35,20 @@ export const DeviceQuantityRequestSchema = z.object({
 
 export const CreateBookingRequestSchema = z.object({
   labRoomId: z.number(),
-  bookingDate: z.string(),
-  slotIds: z.array(z.number()).min(1, 'Chọn ít nhất 1 ca'),
+  slots: z.array(CreateBookingSlotSchema).min(1, 'Ch?n �t nh?t 1 ca'),
   bookingType: BookingTypeSchema,
   purpose: z.string().min(1, 'Vui lòng nhập mục đích').max(500),
-  participants: z.array(AddParticipantRequestSchema).optional(),
+  participants: z.array(CreateBookingParticipantSchema).optional(),
   researchGroupIds: z.array(z.number()).optional(),
   devices: z.array(DeviceQuantityRequestSchema).optional(),
-  force: z.boolean().optional()
 })
 
 export type CreateBookingRequest = z.infer<typeof CreateBookingRequestSchema>
 
-export const RequestStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELED', 'SYSTEM_CANCELED'])
+export const RequestStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELED', 'SYSTEM_CANCELED', 'CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN', 'CANCELLED_BY_PRIORITY_BOOKING', 'COMPLETED', 'EXPIRED'])
 export const BookingParticipantResponseSchema = z.object({
+  participantId: z.number().optional(),
+  userId: z.number().optional(),
   username: z.string(),
   fullName: z.string().optional(),
   role: ParticipantRoleSchema,
@@ -46,6 +56,21 @@ export const BookingParticipantResponseSchema = z.object({
 })
 
 export type BookingParticipantResponse = z.infer<typeof BookingParticipantResponseSchema>
+
+export const BookingWarningSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  relatedUserId: z.number().nullable().optional(),
+  relatedBookingRequestId: z.number().nullable().optional()
+})
+
+export const ParticipantConflictResponseSchema = z.object({
+  userId: z.number().nullable().optional(),
+  conflictingBookingRequestId: z.number().nullable().optional(),
+  conflictingBookingType: BookingTypeSchema.nullable().optional(),
+  suggestedParticipantStatus: z.string().nullable().optional(),
+  message: z.string()
+})
 
 export const BookingDeviceResponseSchema = z.object({
   deviceId: z.number(),
@@ -87,7 +112,10 @@ export const BookingResponseSchema = z.object({
   responseDate: z.string().optional().nullable(),
   responseBy: UserSummaryResponseSchema.optional().nullable(),
   cancelReason: z.string().optional().nullable(),
-  createdAt: z.string()
+  createdAt: z.string(),
+  participants: z.array(BookingParticipantResponseSchema).optional(),
+  warnings: z.array(BookingWarningSchema).optional(),
+  participantConflicts: z.array(ParticipantConflictResponseSchema).optional()
 })
 
 export type BookingResponse = z.infer<typeof BookingResponseSchema>
@@ -147,7 +175,7 @@ export const UpdateBookingRequestSchema = z.object({
   purpose: z.string().min(1, 'Vui lòng nhập mục đích').max(500),
   participants: z.array(AddParticipantRequestSchema).optional(),
   devices: z.array(DeviceQuantityRequestSchema).optional(),
-  force: z.boolean().optional()
+  force: z.boolean().optional(),
 })
 
 export type UpdateBookingRequest = z.infer<typeof UpdateBookingRequestSchema>
@@ -238,7 +266,10 @@ export const SlotBookingDetailItemSchema = z.object({
   responseNote: z.string().optional().nullable(),
   responseDate: z.string().optional().nullable(),
   cancelReason: z.string().optional().nullable(),
-  createdAt: z.string()
+  createdAt: z.string(),
+  participants: z.array(BookingParticipantResponseSchema).optional(),
+  warnings: z.array(BookingWarningSchema).optional(),
+  participantConflicts: z.array(ParticipantConflictResponseSchema).optional()
 })
 
 export type SlotBookingDetailItem = z.infer<typeof SlotBookingDetailItemSchema>

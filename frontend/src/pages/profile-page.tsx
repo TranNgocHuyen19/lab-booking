@@ -9,9 +9,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useUpdateProfileMutation } from '@/queries/user.queries'
+import { useLogoutMutation } from '@/queries/auth.queries'
 import { updateUserRequestSchema, type UpdateUserRequest } from '@/schemas/user.schema'
 import { handleErrorApi } from '@/utils/error-handler'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Save, X, Loader2 } from 'lucide-react'
 import { PATHS } from '@/constants/paths'
 import {
@@ -43,11 +44,25 @@ import { formatDate } from '@/utils/format'
 type TabId = 'profile' | 'groups' | 'security' | 'notifications' | 'settings'
 
 const ProfilePage = () => {
-  const { user, updateUser, logout, refetchUser } = useAuth()
+  const { user, updateUser, logoutLocal, refetchUser } = useAuth()
   const [activeTab, setActiveTab] = useState<TabId>('profile')
   const [isEditing, setIsEditing] = useState(false)
 
   const updateProfileMutation = useUpdateProfileMutation()
+  const logoutMutation = useLogoutMutation()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    if (logoutMutation.isPending) return
+    try {
+      await logoutMutation.mutateAsync(undefined)
+    } catch (error) {
+      console.error('Logout API failed:', error)
+    } finally {
+      logoutLocal()
+      navigate(PATHS.STUDENT.LOGIN)
+    }
+  }
 
   useEffect(() => {
     refetchUser()
@@ -176,7 +191,7 @@ const ProfilePage = () => {
                 <Separator className='my-3 mx-2 opacity-50' />
 
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className='w-full flex items-center gap-3 px-4 py-3.5 text-red-500 hover:bg-red-50 rounded-lg transition-all font-bold'
                 >
                   <LogOut className='h-5 w-5' />

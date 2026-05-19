@@ -9,7 +9,6 @@ import {
   DialogAddAuditingParticipant,
   type AuditingParticipant
 } from '@/components/lecturer/booking/dialog-add-auditing-participant'
-import { DuplicateConfirmDialog } from '@/components/common/duplicate-confirm-dialog'
 import {
   MemberRole,
   MemberRoleLabel,
@@ -19,7 +18,6 @@ import {
 } from '@/constants/types'
 import { formatTime } from '@/utils/format'
 import { sortParticipantsByRole } from '@/utils/participant'
-import { handleErrorApi } from '@/utils/error-handler'
 import { useCreateBookingMutation } from '@/queries/booking.queries'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
@@ -30,6 +28,7 @@ import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { MemberInfoResponse, SecureResearchGroupResponse } from '@/schemas/research-group.schema'
 import type { SlotResponse } from '@/schemas/slot.schema'
 import type { UserResponse } from '@/schemas/user.schema'
+import { handleBookingCreateError, showBookingCreateFeedback } from '@/utils/booking-create-feedback'
 
 interface LecturerBookingFormProps {
   selection: { roomId: number; date: string; slotIds: number[] }
@@ -56,8 +55,6 @@ export const LecturerBookingForm = ({
   const [purpose, setPurpose] = useState<string>('')
   const [deviceQuantities, setDeviceQuantities] = useState<Record<number, number>>({})
   const [showMembers, setShowMembers] = useState<boolean>(false)
-  const [conflictingUsers, setConflictingUsers] = useState<string[]>([])
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
 
   const { data: devicesAvailabilityRes, isLoading: isLoadingDevicesAvailability } = useDeviceAvailabilityQuery({
     labRoomId: selection.roomId,
@@ -99,7 +96,7 @@ export const LecturerBookingForm = ({
     }))
   }
 
-  const handleSaveBooking = async (force: boolean = false) => {
+  const handleSaveBooking = async () => {
     if (!purpose.trim()) {
       toast.error('Vui lòng nhập mục đích sử dụng')
       return
@@ -123,43 +120,36 @@ export const LecturerBookingForm = ({
         }))
 
       const groupParticipants = allMembers.map((m: MemberInfoResponse) => ({
-        username: m.username,
+        userId: m.userId,
         role: (m.username === currentUser?.username
           ? ParticipantRole.SUPERVISOR
           : ParticipantRole.PRESENTER) as ParticipantRoleType
       }))
 
       const auditingList = auditingParticipants.map((p: AuditingParticipant) => ({
-        username: p.username,
+        userId: p.userId,
         role: p.role as ParticipantRoleType
       }))
 
       const payload: CreateBookingRequest = {
         labRoomId: selection.roomId,
-        bookingDate: selection.date,
-        slotIds: selection.slotIds,
+        slots: selection.slotIds.map((slotId) => ({
+          slotId,
+          bookingDate: selection.date
+        })),
         bookingType: 'THESIS',
         purpose,
         participants: [...groupParticipants, ...auditingList],
         researchGroupIds: selectedGroups.map(Number),
-        devices,
-        force
+        devices
       }
 
-      await createBookingMutation.mutateAsync(payload)
-      toast.success('Gửi yêu cầu đăng ký thành công')
+      const response = await createBookingMutation.mutateAsync(payload)
+      showBookingCreateFeedback(response)
       onSuccess()
       queryClient.invalidateQueries({ queryKey: ['labRooms', 'schedule'] })
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const err = error as { response: { data: { code: number; data: string[] } } }
-        if (err.response?.data?.code === 2616) {
-          setConflictingUsers(err.response.data.data)
-          setShowDuplicateDialog(true)
-          return
-        }
-      }
-      handleErrorApi({ error })
+      handleBookingCreateError(error)
     }
   }
 
@@ -499,13 +489,6 @@ export const LecturerBookingForm = ({
           </div>
         </div>
       </div>
-
-      <DuplicateConfirmDialog
-        open={showDuplicateDialog}
-        onOpenChange={setShowDuplicateDialog}
-        onConfirm={() => handleSaveBooking(true)}
-        conflictingUsers={conflictingUsers}
-      />
     </>
   )
 }

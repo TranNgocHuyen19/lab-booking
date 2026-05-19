@@ -7,7 +7,7 @@ import type {
   SecureGroupJoinRequestResponse
 } from '@/schemas/group-join-request.schema'
 import type { ApiResponse, PageResponse } from '@/schemas/base.schema'
-import type { ResearchGroupResponse } from '@/schemas/research-group.schema'
+import type { MyResearchGroupResponse, ResearchGroupResponse } from '@/schemas/research-group.schema'
 import { RequestStatus } from '@/constants/types'
 import { createQuery, createMutation, QUERY_KEYS, QUERY_POLICIES } from '@/query-core'
 
@@ -106,6 +106,8 @@ const updateGroupRequestStatusInCache = (
   requestId: number | null
 ): ApiResponse<PageResponse<ResearchGroupResponse[]>> | undefined => {
   if (!oldData?.data) return oldData
+  if (!Array.isArray(oldData.data.data)) return oldData
+
   return {
     ...oldData,
     data: {
@@ -113,6 +115,24 @@ const updateGroupRequestStatusInCache = (
       data: oldData.data.data.map((group) =>
         group.researchGroupId === groupId ? { ...group, requestStatus, requestId } : group
       )
+    }
+  }
+}
+
+const updateGroupDetailRequestStatusInCache = <T extends ResearchGroupResponse | MyResearchGroupResponse>(
+  oldData: ApiResponse<T> | undefined,
+  groupId: number,
+  requestStatus: string | null,
+  requestId: number | null
+): ApiResponse<T> | undefined => {
+  if (!oldData?.data || oldData.data.researchGroupId !== groupId) return oldData
+
+  return {
+    ...oldData,
+    data: {
+      ...oldData.data,
+      requestStatus,
+      requestId
     }
   }
 }
@@ -132,6 +152,10 @@ export const useCreateJoinRequestMutation = () => {
       queryClient.setQueriesData<ApiResponse<PageResponse<ResearchGroupResponse[]>>>(
         { queryKey: QUERY_KEYS.RESEARCH_GROUP.ROOT },
         (old) => updateGroupRequestStatusInCache(old, variables.researchGroupId, 'PENDING', null)
+      )
+      queryClient.setQueryData<ApiResponse<ResearchGroupResponse | MyResearchGroupResponse>>(
+        QUERY_KEYS.RESEARCH_GROUP.DETAIL(variables.researchGroupId),
+        (old) => updateGroupDetailRequestStatusInCache(old, variables.researchGroupId, 'PENDING', null)
       )
     }
   })()
@@ -282,6 +306,10 @@ export const useCancelJoinRequestMutation = () => {
           queryClient.setQueriesData<ApiResponse<PageResponse<ResearchGroupResponse[]>>>(
             { queryKey: QUERY_KEYS.RESEARCH_GROUP.ROOT },
             (old) => updateGroupRequestStatusInCache(old, updatedRequest.researchGroupId, null, null)
+          ),
+          queryClient.setQueryData<ApiResponse<ResearchGroupResponse | MyResearchGroupResponse>>(
+            QUERY_KEYS.RESEARCH_GROUP.DETAIL(updatedRequest.researchGroupId),
+            (old) => updateGroupDetailRequestStatusInCache(old, updatedRequest.researchGroupId, null, null)
           )
         ])
       }

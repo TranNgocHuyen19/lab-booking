@@ -6,7 +6,6 @@ import { InfiniteScrollSelect } from '@/components/common/infinite-scroll-select
 import { useGroupMembersQuery } from '@/queries/research-group.queries'
 import { useCreateBookingMutation } from '@/queries/booking.queries'
 import { useDeviceAvailabilityQuery } from '@/queries/device.queries'
-import { handleErrorApi } from '@/utils/error-handler'
 import { formatTime } from '@/utils/format'
 import { sortParticipantsByRole } from '@/utils/participant'
 import { cn } from '@/lib/utils'
@@ -16,11 +15,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DuplicateConfirmDialog } from '@/components/common/duplicate-confirm-dialog'
 import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { SlotResponse } from '@/schemas/slot.schema'
 import type { UserResponse } from '@/schemas/user.schema'
 import type { ResearchGroupResponse, MemberInfoResponse } from '@/schemas/research-group.schema'
+import { handleBookingCreateError, showBookingCreateFeedback } from '@/utils/booking-create-feedback'
 
 interface StudentBookingFormProps {
   selection: { roomId: number; date: string; slotIds: number[] }
@@ -49,8 +48,6 @@ export const StudentBookingForm = ({
   const [purpose, setPurpose] = useState<string>('')
   const [deviceQuantities, setDeviceQuantities] = useState<Record<number, number>>({})
   const [showMembersTable, setShowMembersTable] = useState(false)
-  const [conflictingUsers, setConflictingUsers] = useState<string[]>([])
-  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
 
   const { data: members, isLoading: isLoadingMembers } = useGroupMembersQuery(
     Number(selectedGroup),
@@ -79,7 +76,7 @@ export const StudentBookingForm = ({
     }))
   }
 
-  const handleSaveBooking = async (force: boolean = false) => {
+  const handleSaveBooking = async () => {
     if (!purpose.trim()) {
       toast.error('Vui lòng nhập mục đích sử dụng')
       return
@@ -107,36 +104,29 @@ export const StudentBookingForm = ({
       const participants = members
         ?.filter((m) => selectedParticipantUsernames.includes(m.username))
         .map((m) => ({
-          username: m.username,
+          userId: m.userId,
           role: 'GROUP_STUDY' as const
         }))
 
       const payload: CreateBookingRequest = {
         labRoomId: selection.roomId,
-        bookingDate: selection.date,
-        slotIds: selection.slotIds,
+        slots: selection.slotIds.map((slotId) => ({
+          slotId,
+          bookingDate: selection.date
+        })),
         bookingType: bookingType === 'group' ? 'GROUP' : 'PERSONAL',
         purpose,
         participants: bookingType === 'group' ? participants : [],
         researchGroupIds: bookingType === 'group' ? [Number(selectedGroup)] : [],
-        devices,
-        force
+        devices
       }
 
-      await createBookingMutation.mutateAsync(payload)
-      toast.success('Gửi yêu cầu đăng ký thành công')
+      const response = await createBookingMutation.mutateAsync(payload)
+      showBookingCreateFeedback(response)
       onSuccess()
       queryClient.invalidateQueries({ queryKey: ['labRooms', 'schedule'] })
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const err = error as { response: { data: { code: number; data: string[] } } }
-        if (err.response?.data?.code === 2616) {
-          setConflictingUsers(err.response.data.data)
-          setShowDuplicateDialog(true)
-          return
-        }
-      }
-      handleErrorApi({ error })
+      handleBookingCreateError(error)
     }
   }
 
@@ -458,13 +448,6 @@ export const StudentBookingForm = ({
           </div>
         </div>
       </div>
-
-      <DuplicateConfirmDialog
-        open={showDuplicateDialog}
-        onOpenChange={setShowDuplicateDialog}
-        onConfirm={() => handleSaveBooking(true)}
-        conflictingUsers={conflictingUsers}
-      />
     </>
   )
 }

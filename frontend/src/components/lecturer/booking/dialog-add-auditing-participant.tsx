@@ -18,6 +18,7 @@ import type { UserResponse } from '@/schemas/user.schema'
 import { ParticipantRole, ParticipantRoleLabels } from '@/constants/types'
 
 export interface AuditingParticipant {
+  userId: number
   username: string
   fullName: string
   role: typeof ParticipantRole.COMMITTEE | typeof ParticipantRole.OBSERVER
@@ -52,6 +53,7 @@ export const DialogAddAuditingParticipant = ({
   const handleAdd = (user: UserResponse) => {
     const role = selectedRoles[user.username] || ParticipantRole.OBSERVER
     onAdd({
+      userId: user.userId,
       username: user.username,
       fullName: user.fullName,
       role
