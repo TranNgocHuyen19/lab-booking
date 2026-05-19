@@ -55,6 +55,8 @@ public class SecurityConfiguration {
             "/devices",
             "/devices/**",
             "/bookings/**",
+            "/system-configs/attendance",
+            "/system-configs/booking",
     };
 
     private final UserDetailServiceCustomizer userDetailService;

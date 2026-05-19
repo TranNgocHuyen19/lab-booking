@@ -13,12 +13,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.annotation.security.PermitAll;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/system-configs")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
 public class SystemConfigurationController {
 
     private final SystemConfigurationService configService;
@@ -29,12 +30,14 @@ public class SystemConfigurationController {
     }
 
     @PutMapping("/attendance")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceSystemConfigResponse>> updateAttendanceConfig(
             @RequestBody UpdateAttendanceSystemConfigRequest request) {
         return ResponseEntity.ok(ApiResponse.success(configService.updateAttendanceConfig(request)));
     }
 
     @PatchMapping("/attendance/{key}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceSystemConfigResponse>> updateAttendanceField(
             @PathVariable String key,
             @RequestBody UpdateConfigFieldRequest request) {
@@ -42,6 +45,7 @@ public class SystemConfigurationController {
     }
 
     @GetMapping("/attendance/history")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<SystemConfigHistoryResponse>>> getAttendanceHistory() {
         return ResponseEntity.ok(ApiResponse.success(configService.getAttendanceConfigHistory()));
     }
@@ -52,12 +56,14 @@ public class SystemConfigurationController {
     }
 
     @PutMapping("/booking")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<BookingSystemConfigResponse>> updateBookingConfig(
             @RequestBody UpdateBookingSystemConfigRequest request) {
         return ResponseEntity.ok(ApiResponse.success(configService.updateBookingConfig(request)));
     }
 
     @PatchMapping("/booking/{key}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<BookingSystemConfigResponse>> updateBookingField(
             @PathVariable String key,
             @RequestBody UpdateConfigFieldRequest request) {
@@ -65,11 +71,13 @@ public class SystemConfigurationController {
     }
 
     @GetMapping("/booking/history")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<SystemConfigHistoryResponse>>> getBookingHistory() {
         return ResponseEntity.ok(ApiResponse.success(configService.getBookingConfigHistory()));
     }
 
     @GetMapping("/history")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<SystemConfigHistoryResponse>>> getAllConfigHistory() {
         return ResponseEntity.ok(ApiResponse.success(configService.getAllConfigHistory()));
     }
