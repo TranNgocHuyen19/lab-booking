@@ -134,6 +134,8 @@ export const ERROR_MESSAGES: Record<number | string, string> = {
   '2634': 'Phong da co booking thesis trong cung ngay va ca',
   '2635': 'Ban dang co loi moi nhom hoac booking nhom can xu ly trong cung ngay va ca',
   '2636': 'Danh sach ca dat phong bi trung ngay va ca',
+  '2638': 'Bạn không thể tự duyệt hoặc từ chối lịch đặt của chính mình',
+  '2639': 'Bạn đã vượt quá số lượng đơn đặt phòng ở trạng thái chờ duyệt tối đa cho phép',
 
   // ==================== ENTITY: ATTENDANCE (2700-2799) ====================
   '2700': 'Không tìm thấy bản ghi điểm danh',
@@ -230,6 +232,13 @@ const formatDynamicMessage = (code: string, data: ErrorData): string | null => {
     case '2501': {
       const slotName = data.slotName as string
       return `Ca ${slotName} đã có lịch đặt khóa luận tốt nghiệp`
+    }
+
+    // Too far from lab
+    case '2705': {
+      const distance = data.distance as number
+      const maxRadius = data.maxRadius as number
+      return `Bạn đang ở quá xa phòng thực hành (khoảng cách thực tế: ${distance.toFixed(1)}m, bán kính cho phép: ${maxRadius}m)`
     }
 
     default:
