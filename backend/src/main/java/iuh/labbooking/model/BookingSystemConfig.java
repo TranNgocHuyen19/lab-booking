@@ -38,4 +38,7 @@ public class BookingSystemConfig extends BaseEntity {
 
     @Column(name = "lecturer_min_minutes_to_book", nullable = false)
     private Integer lecturerMinMinutesToBook;
+
+    @Column(name = "max_pending_bookings", nullable = false, columnDefinition = "integer default 3")
+    private Integer maxPendingBookings;
 }

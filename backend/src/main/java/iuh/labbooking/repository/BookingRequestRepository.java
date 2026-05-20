@@ -37,6 +37,8 @@ public interface BookingRequestRepository
 
         long countByStatus(RequestStatus status);
 
+        long countByRequester_UserIdAndStatus(Long userId, RequestStatus status);
+
         List<BookingRequest> findByLabRoom_LabRoomId(Long labRoomId);
 
         @Query("SELECT DISTINCT b FROM BookingRequest b " +

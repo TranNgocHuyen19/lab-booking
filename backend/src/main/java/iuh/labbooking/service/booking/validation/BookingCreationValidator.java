@@ -2,6 +2,7 @@ package iuh.labbooking.service.booking.validation;
 
 import iuh.labbooking.enums.BookingType;
 import iuh.labbooking.enums.ParticipantStatus;
+import iuh.labbooking.enums.RequestStatus;
 import iuh.labbooking.enums.ScheduleConflictAction;
 import iuh.labbooking.exception.ErrorCode;
 import iuh.labbooking.model.BookingSystemConfig;
@@ -125,6 +126,15 @@ public class BookingCreationValidator {
 
         BookingSystemConfig config = systemConfigurationService.getActiveBookingConfig();
         String roleName = requester.getRole().getRoleName();
+
+        if (!"ADMIN".equals(roleName)) {
+            long pendingCount = bookingRequestRepository.countByRequester_UserIdAndStatus(
+                    context.requesterId(), RequestStatus.PENDING);
+            if (pendingCount >= config.getMaxPendingBookings()) {
+                result.addError(ErrorCode.MAX_PENDING_BOOKINGS_EXCEEDED);
+                return;
+            }
+        }
         Integer maxAdvanceDays = maxAdvanceDaysForRole(roleName, config);
         if (maxAdvanceDays == null || maxAdvanceDays <= 0) {
             result.addError(ErrorCode.BOOKING_ROLE_NOT_ALLOWED);
