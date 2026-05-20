@@ -6,6 +6,8 @@ import iuh.labbooking.dto.request.booking.BookingStatusRequest;
 import iuh.labbooking.dto.request.booking.CancelBookingRequest;
 import iuh.labbooking.dto.request.booking.CreateBookingDevice;
 import iuh.labbooking.dto.request.booking.CreateBookingRequest;
+import iuh.labbooking.dto.request.booking.CreateBookingSlot;
+import iuh.labbooking.dto.request.booking.CreateBookingParticipant;
 import iuh.labbooking.dto.request.booking.UpdateBookingRequest;
 
 import iuh.labbooking.dto.request.booking.DeviceQuantityRequest;
@@ -550,6 +552,15 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != RequestStatus.PENDING) {
             throw new AppException(ErrorCode.BOOKING_CANNOT_APPROVE);
         }
+
+        BookingCreationContext context = buildCreationContextFromBookingRequest(booking);
+        BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(booking.getBookingType());
+        BookingValidationResult validationResult = strategy.validate(context);
+
+        if (validationResult.hasErrors() || !validationResult.existingScheduleConflicts().isEmpty()) {
+            throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
+        }
+
         BookingSystemConfig currentConfig = configService.getActiveBookingConfig();
         LocalDateTime startTime = getBookingStartTime(booking);
 
@@ -1136,6 +1147,42 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow();
 
         return LocalDateTime.of(firstSlot.getBookingDate(), firstSlot.getStartTime());
+    }
+
+    private BookingCreationContext buildCreationContextFromBookingRequest(BookingRequest booking) {
+        String purpose = booking.getPurpose();
+        BookingType bookingType = booking.getBookingType();
+        Long labRoomId = booking.getLabRoom() != null ? booking.getLabRoom().getLabRoomId() : null;
+        Set<Long> researchGroupIds = booking.getResearchGroup() != null 
+                ? booking.getResearchGroup().stream()
+                        .map(ResearchGroup::getResearchGroupId)
+                        .collect(Collectors.toSet()) 
+                : Set.of();
+
+        List<CreateBookingSlot> slots = booking.getSlotBookings().stream()
+                .map(sb -> new CreateBookingSlot(sb.getSlot().getSlotId(), sb.getBookingDate()))
+                .toList();
+
+        List<CreateBookingParticipant> participants = booking.getParticipants().stream()
+                .map(p -> new CreateBookingParticipant(p.getUser().getUserId(), p.getRole()))
+                .toList();
+
+        List<CreateBookingDevice> devices = booking.getBookingDevices().stream()
+                .map(bd -> new CreateBookingDevice(bd.getDevice().getDeviceId(), bd.getQuantity()))
+                .toList();
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                purpose,
+                bookingType,
+                labRoomId,
+                researchGroupIds,
+                slots,
+                participants,
+                devices,
+                false
+        );
+
+        return new BookingCreationContext(request, booking.getRequester().getUserId());
     }
 }
 
