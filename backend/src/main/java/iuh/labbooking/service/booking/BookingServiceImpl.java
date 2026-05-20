@@ -813,7 +813,7 @@ public class BookingServiceImpl implements BookingService {
                 .map(p -> p.getUser().getUsername())
                 .collect(Collectors.toSet());
 
-        if (!securityUtil.isAdmin() && !existingUsernames.contains(currentUser.getUsername())) {
+        if (!securityUtil.isAdmin() && (!securityUtil.isLecturer() || !existingUsernames.contains(currentUser.getUsername()))) {
             throw new AppException(ErrorCode.NOT_A_PARTICIPANT);
         }
 
