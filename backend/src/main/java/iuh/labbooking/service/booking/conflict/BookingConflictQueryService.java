@@ -1,4 +1,4 @@
-package iuh.labbooking.service.booking;
+package iuh.labbooking.service.booking.conflict;
 
 import iuh.labbooking.enums.BookingType;
 import iuh.labbooking.enums.ParticipantStatus;
@@ -23,7 +23,6 @@ public class BookingConflictQueryService {
     );
 
     public static final List<ParticipantStatus> OCCUPYING_PARTICIPANT_STATUSES = List.of(
-            ParticipantStatus.ACTIVE,
             ParticipantStatus.CONFIRMED,
             ParticipantStatus.INVITED,
             ParticipantStatus.PENDING_CONFLICT_RESOLUTION
@@ -38,7 +37,7 @@ public class BookingConflictQueryService {
                 date,
                 slotIds,
                 ACTIVE_BOOKING_STATUSES,
-                List.of(ParticipantStatus.ACTIVE, ParticipantStatus.CONFIRMED));
+                List.of(ParticipantStatus.CONFIRMED));
     }
 
     public boolean userHasConfirmedGroupBooking(Long userId, LocalDate date, List<Long> slotIds) {

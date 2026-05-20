@@ -1,10 +1,9 @@
 package iuh.labbooking.enums;
 
 public enum ParticipantStatus {
-    ACTIVE,
-    CANCELED,
-    INVITED,
     CONFIRMED,
+    CANCELLED,
+    INVITED,
     PENDING_CONFLICT_RESOLUTION,
     DECLINED
 }

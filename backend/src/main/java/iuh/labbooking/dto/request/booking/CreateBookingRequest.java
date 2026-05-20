@@ -22,5 +22,7 @@ public record CreateBookingRequest(
 
         @Valid List<CreateBookingParticipant> participants,
 
-        @Valid List<CreateBookingDevice> devices) {
+        @Valid List<CreateBookingDevice> devices,
+
+        Boolean forceSwitch) {
 }

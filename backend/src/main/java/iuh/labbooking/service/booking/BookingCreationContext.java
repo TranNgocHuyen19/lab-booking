@@ -68,6 +68,10 @@ public record BookingCreationContext(
         return slots().size() != new java.util.HashSet<>(slotKeys()).size();
     }
 
+    public boolean forceSwitch() {
+        return request.forceSwitch() != null && request.forceSwitch();
+    }
+
     private List<String> slotKeys() {
         return slots().stream()
                 .map(slot -> slot.bookingDate() + "#" + slot.slotId())

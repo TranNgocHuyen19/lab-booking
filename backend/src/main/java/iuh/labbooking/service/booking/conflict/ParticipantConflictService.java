@@ -1,4 +1,4 @@
-package iuh.labbooking.service.booking;
+package iuh.labbooking.service.booking.conflict;
 
 import iuh.labbooking.enums.ParticipantStatus;
 import lombok.RequiredArgsConstructor;

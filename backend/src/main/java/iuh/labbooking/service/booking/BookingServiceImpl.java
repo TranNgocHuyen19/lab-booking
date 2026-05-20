@@ -27,6 +27,7 @@ import iuh.labbooking.repository.*;
 import iuh.labbooking.service.booking.strategy.BookingCreationStrategy;
 import iuh.labbooking.service.booking.strategy.BookingStrategyFactory;
 import iuh.labbooking.service.booking.validation.BookingValidationResult;
+import iuh.labbooking.service.booking.validation.BookingValidationResult.ExistingScheduleConflictResult;
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
 import iuh.labbooking.service.researchgroup.ResearchGroupService;
 import iuh.labbooking.service.user.UserService;
@@ -56,6 +57,7 @@ public class BookingServiceImpl implements BookingService {
     private final SlotBookingRepository slotBookingRepository;
     private final BookingParticipantRepository bookingParticipantRepository;
     private final LabRoomRepository labRoomRepository;
+    private final ResearchGroupRepository researchGroupRepository;
     private final SlotRepository slotRepository;
     private final UserService userService;
     private final SecurityUtil securityUtil;
@@ -85,6 +87,15 @@ public class BookingServiceImpl implements BookingService {
 
         BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(context.bookingType());
         BookingValidationResult validationResult = strategy.validate(context);
+
+        if (!validationResult.existingScheduleConflicts().isEmpty()) {
+            if (context.forceSwitch()) {
+                cancelOrLeaveConflictingBookings(currentUserId, validationResult.existingScheduleConflicts());
+            } else {
+                throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
+            }
+        }
+
         if (validationResult.hasErrors()) {
             throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
         }
@@ -97,8 +108,62 @@ public class BookingServiceImpl implements BookingService {
         return bookingCreationResponseMapper.toResponse(bookingRequest, validationResult);
     }
 
+    private void cancelOrLeaveConflictingBookings(Long userId, List<ExistingScheduleConflictResult> conflicts) {
+        Set<Long> conflictingBookingRequestIds = conflicts.stream()
+                .map(ExistingScheduleConflictResult::conflictingBookingRequestId)
+                .collect(Collectors.toSet());
+
+        List<Long> sortedIds = conflictingBookingRequestIds.stream()
+                .sorted()
+                .toList();
+
+        for (Long bookingId : sortedIds) {
+            BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingId)
+                    .orElse(null);
+            if (booking == null) {
+                continue;
+            }
+
+            if (booking.getBookingType() == BookingType.PERSONAL) {
+                RequestStatus oldStatus = booking.getStatus();
+                if (oldStatus == RequestStatus.PENDING || oldStatus == RequestStatus.APPROVED) {
+                    booking.setStatus(RequestStatus.CANCELED);
+                    bookingRequestRepository.save(booking);
+
+                    List<BookingParticipant> participants = bookingParticipantRepository.findByBookingRequest(booking);
+                    participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELLED));
+                    bookingParticipantRepository.saveAll(participants);
+
+                    saveBookingStatusHistory(booking, oldStatus, RequestStatus.CANCELED, StatusChangeReason.USER_CANCELED,
+                            "Cancelled to switch to a new personal booking.", null);
+                }
+            } else if (booking.getBookingType() == BookingType.GROUP) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                BookingParticipant participant = bookingParticipantRepository
+                        .findByBookingRequestAndUser(booking, user)
+                        .orElse(null);
+                if (participant != null && participant.getStatus() == ParticipantStatus.CONFIRMED) {
+                    participant.setStatus(ParticipantStatus.CANCELLED);
+                    bookingParticipantRepository.save(participant);
+                }
+            }
+        }
+    }
+
     private void lockResourcesForCreationV2(BookingCreationContext context) {
-        labRoomRepository.findByLabRoomIdForUpdate(context.labRoomId())
+        if (context.bookingType() == BookingType.PERSONAL) {
+            userRepository.lockByUserId(context.requesterId())
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        }
+
+        if (context.bookingType() == BookingType.GROUP && context.researchGroupIds().size() == 1) {
+            Long researchGroupId = context.researchGroupIds().iterator().next();
+            researchGroupRepository.lockByResearchGroupId(researchGroupId)
+                    .orElseThrow(() -> new AppException(ErrorCode.RESEARCH_GROUP_NOT_FOUND));
+        }
+
+        labRoomRepository.lockByLabRoomId(context.labRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.LAB_ROOM_NOT_FOUND));
 
         if (!context.devices().isEmpty()) {
@@ -125,7 +190,7 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_NOT_FOUND, "Đơn đặt không có thông tin ca học");
         }
 
-        LabRoom labRoom = labRoomRepository.findByLabRoomIdForUpdate(booking.getLabRoom().getLabRoomId())
+        LabRoom labRoom = labRoomRepository.lockByLabRoomId(booking.getLabRoom().getLabRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.LAB_ROOM_NOT_FOUND));
 
         if (request.devices() != null && !request.devices().isEmpty()) {
@@ -268,7 +333,7 @@ public class BookingServiceImpl implements BookingService {
                         labRoom.getLabRoomId(),
                         bookingDate,
                         slotIds,
-                        ParticipantStatus.ACTIVE,
+                        ParticipantStatus.CONFIRMED,
                         List.of(RequestStatus.PENDING, RequestStatus.APPROVED));
 
         Map<Long, Integer> activeCountBySlot = results.stream()
@@ -354,7 +419,7 @@ public class BookingServiceImpl implements BookingService {
 
         User currentUser = securityUtil.getCurrentUser();
 
-        BookingRequest booking = bookingRequestRepository.findById(bookingRequestId)
+        BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingRequestId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
         if (!booking.getRequester().getUserId().equals(currentUser.getUserId())) {
@@ -384,7 +449,7 @@ public class BookingServiceImpl implements BookingService {
         List<BookingParticipant> participants = bookingParticipantRepository
                 .findByBookingRequest(booking);
 
-        participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELED));
+        participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELLED));
         bookingParticipantRepository.saveAll(participants);
 
         log.info("Booking canceled: ID={}, Participants canceled: {}",
@@ -421,18 +486,18 @@ public class BookingServiceImpl implements BookingService {
                 .findByBookingRequestAndUser(booking, currentUser)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_A_PARTICIPANT));
 
-        if (participant.getStatus() != ParticipantStatus.ACTIVE) {
+        if (participant.getStatus() != ParticipantStatus.CONFIRMED) {
             throw new AppException(ErrorCode.NOT_A_PARTICIPANT);
         }
 
         long activeCount = bookingParticipantRepository
-                .countByBookingRequestAndStatus(booking, ParticipantStatus.ACTIVE);
+                .countByBookingRequestAndStatus(booking, ParticipantStatus.CONFIRMED);
 
         if (activeCount <= 1) {
             throw new AppException(ErrorCode.CANNOT_REMOVE_LAST_PARTICIPANT);
         }
 
-        participant.setStatus(ParticipantStatus.CANCELED);
+        participant.setStatus(ParticipantStatus.CANCELLED);
         bookingParticipantRepository.save(participant);
 
         log.info("User {} left booking {}", currentUser.getUserId(), bookingRequestId);
@@ -449,7 +514,7 @@ public class BookingServiceImpl implements BookingService {
                 .findByRequester(currentUser);
 
         List<BookingParticipant> asParticipant = bookingParticipantRepository
-                .findByUserAndStatus(currentUser, ParticipantStatus.ACTIVE);
+                .findByUserAndStatus(currentUser, ParticipantStatus.CONFIRMED);
 
         Set<BookingRequest> allBookings = new HashSet<>(asRequester);
         asParticipant.forEach(p -> allBookings.add(p.getBookingRequest()));
@@ -485,7 +550,7 @@ public class BookingServiceImpl implements BookingService {
 
         boolean isRequester = booking.getRequester().getUserId().equals(currentUser.getUserId());
         boolean isActiveParticipant = bookingParticipantRepository
-                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.ACTIVE);
+                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.CONFIRMED);
         boolean isAdmin = currentUser.getRole().getRoleName().equals("ADMIN");
 
         if (!isRequester && !isActiveParticipant && !isAdmin) {
@@ -535,7 +600,7 @@ public class BookingServiceImpl implements BookingService {
 
         User currentUser = securityUtil.getCurrentUser();
         boolean isActiveParticipant = bookingParticipantRepository
-                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.ACTIVE);
+                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.CONFIRMED);
         boolean isAdminOrLecturer = securityUtil.isAdmin() || securityUtil.isLecturer();
 
         if (!isActiveParticipant && !isAdminOrLecturer) {
@@ -560,7 +625,7 @@ public class BookingServiceImpl implements BookingService {
 
         boolean isRequester = booking.getRequester().getUserId().equals(currentUser.getUserId());
         boolean isActiveParticipant = bookingParticipantRepository
-                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.ACTIVE);
+                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.CONFIRMED);
         boolean isAdminOrLecturer = securityUtil.isAdmin() || securityUtil.isLecturer();
 
         if (!isRequester && !isActiveParticipant && !isAdminOrLecturer) {
@@ -590,7 +655,7 @@ public class BookingServiceImpl implements BookingService {
     public SecureBookingResponse approveBooking(Long bookingRequestId, BookingStatusRequest request) {
         log.info("Approving booking: ID={}", bookingRequestId);
         User approver = securityUtil.getCurrentUser();
-        BookingRequest booking = bookingRequestRepository.findById(bookingRequestId)
+        BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingRequestId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
         if (booking.getStatus() != RequestStatus.PENDING) {
             throw new AppException(ErrorCode.BOOKING_CANNOT_APPROVE);
@@ -621,7 +686,7 @@ public class BookingServiceImpl implements BookingService {
         AttendanceSystemConfig attendanceSnapshot = configService.createAttendanceSnapshot();
 
         List<BookingParticipant> activeParticipants = bookingParticipantRepository
-                .findByBookingRequestAndStatus(booking, ParticipantStatus.ACTIVE);
+                .findByBookingRequestAndStatus(booking, ParticipantStatus.CONFIRMED);
 
         List<BookingSlotAttendance> attendances = new ArrayList<>();
         for (BookingParticipant participant : activeParticipants) {
@@ -653,7 +718,7 @@ public class BookingServiceImpl implements BookingService {
 
         User approver = securityUtil.getCurrentUser();
 
-        BookingRequest booking = bookingRequestRepository.findById(bookingRequestId)
+        BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingRequestId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
         if (booking.getStatus() != RequestStatus.PENDING) {
@@ -684,7 +749,7 @@ public class BookingServiceImpl implements BookingService {
 
         User approver = securityUtil.getCurrentUser();
 
-        BookingRequest booking = bookingRequestRepository.findById(bookingRequestId)
+        BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingRequestId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
         if (booking.getStatus() == RequestStatus.CANCELED || booking.getStatus() == RequestStatus.SYSTEM_CANCELED
@@ -700,7 +765,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setResponseNote(note);
 
         List<BookingParticipant> participants = bookingParticipantRepository.findByBookingRequest(booking);
-        participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELED));
+        participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELLED));
         bookingParticipantRepository.saveAll(participants);
 
         List<BookingSlotAttendance> attendances = bookingSlotAttendanceRepository
@@ -724,7 +789,7 @@ public class BookingServiceImpl implements BookingService {
         BookingStatusRequest request = new BookingStatusRequest(
                 note != null && !note.isEmpty() ? note : null
         );
-        for (Long id : bookingRequestIds) {
+        for (Long id : bookingRequestIds.stream().sorted().toList()) {
             try {
                 approveBooking(id, request);
             } catch (Exception e) {
@@ -738,7 +803,7 @@ public class BookingServiceImpl implements BookingService {
     public void bulkReject(List<Long> bookingRequestIds, String reason) {
         log.info("Bulk rejecting {} bookings", bookingRequestIds.size());
         BookingStatusRequest request = new BookingStatusRequest(reason);
-        for (Long id : bookingRequestIds) {
+        for (Long id : bookingRequestIds.stream().sorted().toList()) {
             try {
                 rejectBooking(id, request);
             } catch (Exception e) {
@@ -752,7 +817,7 @@ public class BookingServiceImpl implements BookingService {
     public void bulkSystemCancel(List<Long> bookingRequestIds, String reason) {
         log.info("Bulk system-canceling {} bookings", bookingRequestIds.size());
         BookingStatusRequest request = new BookingStatusRequest(reason);
-        for (Long id : bookingRequestIds) {
+        for (Long id : bookingRequestIds.stream().sorted().toList()) {
             try {
                 systemCancelBooking(id, request);
             } catch (Exception e) {
@@ -849,7 +914,7 @@ public class BookingServiceImpl implements BookingService {
                     .bookingRequest(booking)
                     .user(user)
                     .role(participantInfo.role())
-                    .status(ParticipantStatus.ACTIVE)
+                    .status(ParticipantStatus.CONFIRMED)
                     .build();
             newParticipants.add(participant);
         }
@@ -964,7 +1029,7 @@ public class BookingServiceImpl implements BookingService {
                     .bookingRequest(booking)
                     .user(user)
                     .role(pr.role())
-                    .status(ParticipantStatus.ACTIVE)
+                    .status(ParticipantStatus.CONFIRMED)
                     .build();
         }).toList();
     }
@@ -1012,7 +1077,7 @@ public class BookingServiceImpl implements BookingService {
             br.setResponseNote(note);
 
             List<BookingParticipant> participants = bookingParticipantRepository.findByBookingRequest(br);
-            participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELED));
+            participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELLED));
             bookingParticipantRepository.saveAll(participants);
 
             List<BookingSlotAttendance> attendances = bookingSlotAttendanceRepository
@@ -1095,7 +1160,7 @@ public class BookingServiceImpl implements BookingService {
                                 .leaderName(leader != null ? leader.getFullName() : null)
                                 .leaderUsername(leader != null ? leader.getUsername() : null)
                                 .participantCount(b.getParticipants() != null ? (int) b.getParticipants().stream()
-                                        .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE).count() : 0)
+                                        .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED).count() : 0)
                                 .devices(deviceList)
                                 .responseNote(b.getResponseNote())
                                 .createdAt(b.getCreatedAt())
@@ -1106,7 +1171,7 @@ public class BookingServiceImpl implements BookingService {
             for (BookingRequest b : bookings) {
                 int activeCount = b.getParticipants() != null
                         ? (int) b.getParticipants().stream()
-                        .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE).count()
+                        .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED).count()
                         : 0;
 
                 if (b.getStatus() == RequestStatus.APPROVED) {
@@ -1160,7 +1225,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return booking.getParticipants().stream()
-                .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
+                .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED)
                 .map(p -> SlotBookingDetailParticipant.builder()
                         .participantId(p.getBookingParticipantId())
                         .userId(p.getUser().getUserId())

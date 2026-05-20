@@ -3,6 +3,7 @@ package iuh.labbooking.mapper.booking;
 import iuh.labbooking.dto.response.booking.BookingParticipantResponse;
 import iuh.labbooking.dto.response.booking.BookingResponse;
 import iuh.labbooking.dto.response.booking.BookingWarning;
+import iuh.labbooking.dto.response.booking.ExistingScheduleConflictResponse;
 import iuh.labbooking.dto.response.booking.ParticipantConflictResponse;
 import iuh.labbooking.dto.response.bookingdevice.BookingDeviceResponse;
 import iuh.labbooking.dto.response.slot.SlotResponse;
@@ -89,6 +90,17 @@ public class BookingCreationResponseMapper {
                                 conflict.conflictingBookingType(),
                                 conflict.suggestedParticipantStatus(),
                                 conflict.message()))
+                        .toList())
+                .existingScheduleConflicts(validationResult.existingScheduleConflicts().stream()
+                        .map(conflict -> new ExistingScheduleConflictResponse(
+                                conflict.code(),
+                                conflict.message(),
+                                conflict.userId(),
+                                conflict.conflictingBookingRequestId(),
+                                conflict.conflictingBookingType(),
+                                conflict.bookingDate(),
+                                conflict.slotId(),
+                                conflict.suggestedAction()))
                         .toList())
                 .build();
     }

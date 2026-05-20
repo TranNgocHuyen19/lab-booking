@@ -7,9 +7,11 @@ import iuh.labbooking.enums.RequestStatus;
 import iuh.labbooking.model.BookingParticipant;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,6 +23,10 @@ import java.util.Set;
 
 @Repository
 public interface BookingParticipantRepository extends JpaRepository<BookingParticipant, Long> {
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT bp FROM BookingParticipant bp WHERE bp.bookingParticipantId = :id")
+  Optional<BookingParticipant> lockByBookingParticipantId(@Param("id") Long id);
+
         @Query("""
                             SELECT bp.bookingRequest.bookingRequestId, COUNT(bp)
                             FROM BookingParticipant bp
@@ -61,7 +67,7 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         JOIN bp.bookingRequest br
                         JOIN SlotBooking sb ON sb.bookingRequest = br
                         WHERE bp.user.userId IN :userIds
-                          AND bp.status = 'ACTIVE'
+                          AND bp.status = 'CONFIRMED'
                           AND br.status IN ('PENDING', 'APPROVED')
                           AND (:excludeId IS NULL OR br.bookingRequestId <> :excludeId)
                           AND sb.bookingDate = :bookingDate
@@ -79,7 +85,7 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         JOIN bp.bookingRequest br
                         JOIN SlotBooking sb ON sb.bookingRequest = br
                         WHERE bp.user.userId IN :userIds
-                          AND bp.status = 'ACTIVE'
+                          AND bp.status = 'CONFIRMED'
                           AND br.status IN ('PENDING', 'APPROVED')
                           AND (:excludeId IS NULL OR br.bookingRequestId <> :excludeId)
                           AND sb.bookingDate = :bookingDate

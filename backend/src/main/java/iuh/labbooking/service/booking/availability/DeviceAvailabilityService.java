@@ -1,11 +1,13 @@
-package iuh.labbooking.service.booking;
+package iuh.labbooking.service.booking.availability;
 
 import iuh.labbooking.dto.request.booking.CreateBookingDevice;
 import iuh.labbooking.dto.request.booking.CreateBookingSlot;
 import iuh.labbooking.model.LabRoomDevice;
 import iuh.labbooking.repository.BookingDeviceRepository;
 import iuh.labbooking.repository.LabRoomDeviceRepository;
-import iuh.labbooking.service.booking.validation.DeviceAvailabilityResult;
+import iuh.labbooking.service.booking.BookingCreationContext;
+import iuh.labbooking.service.booking.conflict.BookingConflictQueryService;
+import iuh.labbooking.service.booking.validation.BookingValidationResult.DeviceAvailabilityResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -54,4 +56,5 @@ public class DeviceAvailabilityService {
 
         return results;
     }
+
 }

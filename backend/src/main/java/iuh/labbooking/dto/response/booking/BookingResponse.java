@@ -40,5 +40,6 @@ public record BookingResponse(
         LocalDateTime createdAt,
         List<BookingParticipantResponse> participants,
         List<BookingWarning> warnings,
-        List<ParticipantConflictResponse> participantConflicts) {
+        List<ParticipantConflictResponse> participantConflicts,
+        List<ExistingScheduleConflictResponse> existingScheduleConflicts) {
 }

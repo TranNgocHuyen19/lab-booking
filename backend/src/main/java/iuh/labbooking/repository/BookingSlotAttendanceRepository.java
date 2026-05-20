@@ -68,7 +68,7 @@ public interface BookingSlotAttendanceRepository extends JpaRepository<BookingSl
             JOIN br.slotBookings sb
             WHERE sb.bookingDate BETWEEN :fromDate AND :toDate
               AND br.status = 'APPROVED'
-              AND a.bookingParticipant.status = 'ACTIVE'
+              AND a.bookingParticipant.status = 'CONFIRMED'
             """)
     List<Object[]> getNoShowStats(
             @Param("fromDate") LocalDate fromDate,

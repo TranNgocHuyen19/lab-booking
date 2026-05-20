@@ -22,16 +22,11 @@ import iuh.labbooking.repository.LabRoomRepository;
 import iuh.labbooking.repository.ResearchGroupRepository;
 import iuh.labbooking.repository.SlotRepository;
 import iuh.labbooking.repository.UserRepository;
-import iuh.labbooking.service.booking.BookingConflictQueryService;
 import iuh.labbooking.service.booking.BookingCreationContext;
 import iuh.labbooking.service.booking.BookingHistoryService;
-import iuh.labbooking.service.booking.DeviceAvailabilityService;
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
-import iuh.labbooking.service.booking.validation.BookingValidationError;
-import iuh.labbooking.service.booking.validation.BookingValidationResult;
 import lombok.RequiredArgsConstructor;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -47,51 +42,7 @@ abstract class AbstractBookingCreationStrategy implements BookingCreationStrateg
     protected final DeviceRepository deviceRepository;
     protected final ResearchGroupRepository researchGroupRepository;
     protected final SystemConfigurationService systemConfigurationService;
-    protected final DeviceAvailabilityService deviceAvailabilityService;
     protected final BookingHistoryService bookingHistoryService;
-
-    protected void validateRequestShape(BookingCreationContext context, BookingValidationResult result) {
-        if (context.hasDuplicatedSlots()) {
-            result.addError(ErrorCode.DUPLICATED_SLOT_IN_REQUEST);
-        }
-    }
-
-    protected void validateDevices(BookingCreationContext context, BookingValidationResult result) {
-        deviceAvailabilityService.checkAvailability(context).stream()
-                .filter(device -> !device.available())
-                .map(device -> new BookingValidationError(
-                        ErrorCode.INSUFFICIENT_DEVICE_QUANTITY.name(),
-                        "Device " + device.deviceId() + " only has " + device.availableQuantity() + " available item(s)",
-                        null,
-                        null))
-                .forEach(result::addError);
-    }
-
-    protected void validateCapacity(
-            BookingCreationContext context,
-            BookingValidationResult result,
-            BookingConflictQueryService conflictQueryService,
-            int newParticipantCount) {
-        LabRoom labRoom = labRoomRepository.findById(context.labRoomId())
-                .orElseThrow(() -> new AppException(ErrorCode.LAB_ROOM_NOT_FOUND));
-
-        for (CreateBookingSlot slot : context.slots()) {
-            long occupiedSeats = conflictQueryService.countOccupiedSeats(
-                    context.labRoomId(),
-                    slot.bookingDate(),
-                    slot.slotId());
-
-            if (occupiedSeats + newParticipantCount > labRoom.getCapacity()) {
-                result.addError(
-                        ErrorCode.BOOKING_EXCEEDS_CAPACITY.name(),
-                        "Room capacity exceeded for date " + slot.bookingDate()
-                                + ", slot " + slot.slotId()
-                                + ". Capacity: " + labRoom.getCapacity()
-                                + ", occupied: " + occupiedSeats
-                                + ", requested: " + newParticipantCount);
-            }
-        }
-    }
 
     protected BookingRequest persistBooking(
             BookingCreationContext context,
@@ -135,10 +86,6 @@ abstract class AbstractBookingCreationStrategy implements BookingCreationStrateg
             return new HashSet<>();
         }
         return new HashSet<>(researchGroupRepository.findAllById(researchGroupIds));
-    }
-
-    protected LocalDate primaryDate(BookingCreationContext context) {
-        return context.primaryDate();
     }
 
     protected List<Long> slotIds(BookingCreationContext context) {

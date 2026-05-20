@@ -1,10 +1,13 @@
 package iuh.labbooking.repository;
 
 import iuh.labbooking.enums.RequestStatus;
+import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,6 +26,10 @@ public interface BookingRequestRepository
                 extends JpaRepository<BookingRequest, Long> {
         @EntityGraph(attributePaths = { "researchGroup", "participants", "bookingDevices", "slotBookings", "labRoom" })
         Optional<BookingRequest> findByBookingRequestId(Long id);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT b FROM BookingRequest b WHERE b.bookingRequestId = :id")
+        Optional<BookingRequest> lockByBookingRequestId(@Param("id") Long id);
 
         List<BookingRequest> findByRequester(User requester);
 
@@ -126,6 +133,109 @@ public interface BookingRequestRepository
                         @Param("bookingDate") LocalDate bookingDate,
                         @Param("slotIds") List<Long> slotIds,
                         @Param("bookingTypes") List<BookingType> bookingTypes,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
+        
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.participants bp
+                JOIN br.slotBookings sb
+                WHERE bp.user.userId = :userId
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId = :slotId
+                """)
+        List<BookingRequest> findActiveBookingsByUserDateSlot(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotId") Long slotId,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.participants bp
+                JOIN br.slotBookings sb
+                WHERE bp.user.userId = :userId
+                  AND bp.status IN :occupyingParticipantStatuses
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        List<BookingRequest> findActiveBookingsByUserDateSlots(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("occupyingParticipantStatuses") List<ParticipantStatus> occupyingParticipantStatuses);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.slotBookings sb
+                WHERE br.labRoom.labRoomId = :labRoomId
+                  AND br.bookingType IN ('PERSONAL', 'GROUP')
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        List<BookingRequest> findActivePersonalOrGroupBookingsInRoom(
+                        @Param("labRoomId") Long labRoomId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.slotBookings sb
+                WHERE br.labRoom.labRoomId = :labRoomId
+                  AND br.bookingType = 'THESIS'
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        List<BookingRequest> findActiveThesisByRoomDateSlot(
+                        @Param("labRoomId") Long labRoomId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.participants bp
+                JOIN br.slotBookings sb
+                WHERE bp.user.userId = :userId
+                  AND br.bookingType = :bookingType
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        List<BookingRequest> findActiveBookingsByUserDateSlotsAndType(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("bookingType") BookingType bookingType,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
+                JOIN br.participants bp
+                JOIN br.slotBookings sb
+                WHERE bp.user.userId = :userId
+                  AND br.bookingType = 'GROUP'
+                  AND bp.status = :participantStatus
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                """)
+        List<BookingRequest> findActiveGroupBookingsByUserDateSlotsAndParticipantStatus(
+                        @Param("userId") Long userId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("participantStatus") ParticipantStatus participantStatus,
                         @Param("activeStatuses") List<RequestStatus> activeStatuses);
 }
 

@@ -4,7 +4,6 @@ import iuh.labbooking.service.booking.BookingCreationContext;
 import iuh.labbooking.enums.BookingType;
 import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.enums.RequestStatus;
-import iuh.labbooking.exception.ErrorCode;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.ResearchGroup;
 import iuh.labbooking.repository.BookingRequestRepository;
@@ -13,11 +12,10 @@ import iuh.labbooking.repository.LabRoomRepository;
 import iuh.labbooking.repository.ResearchGroupRepository;
 import iuh.labbooking.repository.SlotRepository;
 import iuh.labbooking.repository.UserRepository;
-import iuh.labbooking.service.booking.BookingConflictQueryService;
 import iuh.labbooking.service.booking.BookingHistoryService;
-import iuh.labbooking.service.booking.DeviceAvailabilityService;
-import iuh.labbooking.service.booking.ThesisOverrideService;
+import iuh.labbooking.service.booking.conflict.ThesisOverrideService;
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
+import iuh.labbooking.service.booking.validation.BookingCreationValidator;
 import iuh.labbooking.service.booking.validation.BookingValidationResult;
 import org.springframework.stereotype.Component;
 
@@ -27,8 +25,8 @@ import java.util.Set;
 @Component
 public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
 
-    private final BookingConflictQueryService conflictQueryService;
     private final ThesisOverrideService thesisOverrideService;
+    private final BookingCreationValidator bookingCreationValidator;
 
     public ThesisBookingStrategy(
             BookingRequestRepository bookingRequestRepository,
@@ -38,14 +36,13 @@ public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
             DeviceRepository deviceRepository,
             ResearchGroupRepository researchGroupRepository,
             SystemConfigurationService systemConfigurationService,
-            DeviceAvailabilityService deviceAvailabilityService,
             BookingHistoryService bookingHistoryService,
-            BookingConflictQueryService conflictQueryService,
-            ThesisOverrideService thesisOverrideService) {
+            ThesisOverrideService thesisOverrideService,
+            BookingCreationValidator bookingCreationValidator) {
         super(bookingRequestRepository, userRepository, labRoomRepository, slotRepository, deviceRepository,
-                researchGroupRepository, systemConfigurationService, deviceAvailabilityService, bookingHistoryService);
-        this.conflictQueryService = conflictQueryService;
+                researchGroupRepository, systemConfigurationService, bookingHistoryService);
         this.thesisOverrideService = thesisOverrideService;
+        this.bookingCreationValidator = bookingCreationValidator;
     }
 
     @Override
@@ -55,17 +52,7 @@ public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
 
     @Override
     public BookingValidationResult validate(BookingCreationContext context) {
-        BookingValidationResult result = BookingValidationResult.ok();
-        validateRequestShape(context, result);
-        if (result.hasErrors()) {
-            return result;
-        }
-
-        if (conflictQueryService.roomHasActiveThesisBooking(context.labRoomId(), primaryDate(context), slotIds(context))) {
-            result.addError(ErrorCode.ROOM_HAS_THESIS_BOOKING);
-        }
-        validateDevices(context, result);
-        return result;
+        return bookingCreationValidator.validateThesis(context);
     }
 
     @Override
@@ -82,7 +69,7 @@ public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
     public void afterCreated(BookingRequest bookingRequest, BookingCreationContext context) {
         thesisOverrideService.cancelConflictingPersonalAndGroupBookings(
                 bookingRequest,
-                primaryDate(context),
+                context.primaryDate(),
                 slotIds(context));
     }
 }
