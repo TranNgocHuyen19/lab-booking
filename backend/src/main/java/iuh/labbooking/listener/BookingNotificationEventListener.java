@@ -3,6 +3,7 @@ package iuh.labbooking.listener;
 import iuh.labbooking.event.BookingCancelledByThesisEvent;
 import iuh.labbooking.event.BookingCreatedEvent;
 import iuh.labbooking.event.BookingStatusChangedEvent;
+import iuh.labbooking.event.ParticipantConflictRequiredEvent;
 import iuh.labbooking.event.ParticipantConflictResolvedEvent;
 import iuh.labbooking.event.ThesisParticipantAddedEvent;
 import iuh.labbooking.service.notification.NotificationService;
@@ -30,6 +31,18 @@ public class BookingNotificationEventListener {
         log.info("Creating booking status notification after commit for bookingRequestId={}, newStatus={}",
                 event.bookingRequestId(), event.newStatus());
         notificationService.handleBookingStatusChanged(event.bookingRequestId(), event.newStatus(), event.actorId());
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleParticipantConflictRequiredEvent(ParticipantConflictRequiredEvent event) {
+        log.info("Creating PARTICIPANT_CONFLICT_REQUIRED notification after commit for bookingRequestId={}, participantId={}, userId={}",
+                event.bookingRequestId(), event.participantId(), event.userId());
+        notificationService.handleParticipantConflictRequired(
+                event.bookingRequestId(),
+                event.participantId(),
+                event.userId(),
+                event.actorId()
+        );
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

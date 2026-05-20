@@ -20,6 +20,8 @@ public interface NotificationService {
 
     void handleBookingStatusChanged(Long bookingRequestId, RequestStatus newStatus, Long actorId);
 
+    void handleParticipantConflictRequired(Long bookingRequestId, Long participantId, Long userId, Long actorId);
+
     void handleBookingCancelledByThesis(Long thesisBookingRequestId, List<Long> cancelledBookingRequestIds);
 
     void handleParticipantConflictResolved(Long bookingRequestId, Long participantId, Long userId);

@@ -26,6 +26,7 @@ import iuh.labbooking.service.booking.BookingCreationContext;
 import iuh.labbooking.service.booking.BookingHistoryService;
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 
 @RequiredArgsConstructor
+@Slf4j
 abstract class AbstractBookingCreationStrategy implements BookingCreationStrategy {
 
     protected final BookingRequestRepository bookingRequestRepository;
@@ -54,6 +56,15 @@ abstract class AbstractBookingCreationStrategy implements BookingCreationStrateg
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         LabRoom labRoom = labRoomRepository.findById(context.labRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.LAB_ROOM_NOT_FOUND));
+        log.info("Persisting booking: requesterId={}, type={}, status={}, labRoomId={}, slotCount={}, participantSeedCount={}, deviceCount={}, researchGroupCount={}",
+                context.requesterId(),
+                context.bookingType(),
+                status,
+                context.labRoomId(),
+                context.slots().size(),
+                participants.size(),
+                context.devices().size(),
+                researchGroups.size());
 
         BookingRequest booking = BookingRequest.builder()
                 .purpose(context.purpose())
@@ -70,6 +81,13 @@ abstract class AbstractBookingCreationStrategy implements BookingCreationStrateg
         booking.setBookingDevices(buildBookingDevices(context, booking));
 
         BookingRequest saved = bookingRequestRepository.save(booking);
+        log.info("Booking saved: bookingRequestId={}, type={}, status={}, slotCount={}, participantCount={}, deviceCount={}",
+                saved.getBookingRequestId(),
+                saved.getBookingType(),
+                saved.getStatus(),
+                saved.getSlotBookings().size(),
+                saved.getParticipants().size(),
+                saved.getBookingDevices().size());
         bookingHistoryService.saveStatusChange(
                 saved,
                 null,
@@ -77,6 +95,9 @@ abstract class AbstractBookingCreationStrategy implements BookingCreationStrateg
                 StatusChangeReason.NEW_REQUEST,
                 "Booking request created",
                 null);
+        log.debug("Initial booking status history saved: bookingRequestId={}, status={}",
+                saved.getBookingRequestId(),
+                status);
 
         return saved;
     }

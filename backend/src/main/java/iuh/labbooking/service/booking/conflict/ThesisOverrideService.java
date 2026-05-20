@@ -8,6 +8,7 @@ import iuh.labbooking.repository.BookingRequestRepository;
 import iuh.labbooking.service.booking.BookingHistoryService;
 import iuh.labbooking.event.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ThesisOverrideService {
 
     private final BookingConflictQueryService conflictQueryService;
@@ -28,6 +30,11 @@ public class ThesisOverrideService {
     private final ApplicationEventPublisher eventPublisher;
 
     public void cancelConflictingPersonalAndGroupBookings(BookingRequest thesisBooking, LocalDate date, List<Long> slotIds) {
+        log.info("Checking thesis override conflicts: thesisBookingId={}, labRoomId={}, date={}, slotIds={}",
+                thesisBooking.getBookingRequestId(),
+                thesisBooking.getLabRoom().getLabRoomId(),
+                date,
+                slotIds);
         List<BookingRequest> conflicts = conflictQueryService.findActivePersonalOrGroupBookingsInRoom(
                 thesisBooking.getLabRoom().getLabRoomId(),
                 date,
@@ -37,6 +44,9 @@ public class ThesisOverrideService {
             .map(BookingRequest::getBookingRequestId)
             .sorted(Comparator.naturalOrder())
             .toList();
+        log.info("Thesis override conflict scan completed: thesisBookingId={}, conflictIds={}",
+                thesisBooking.getBookingRequestId(),
+                conflictIds);
 
         List<BookingRequest> updatedConflicts = new ArrayList<>();
 
@@ -44,11 +54,15 @@ public class ThesisOverrideService {
             BookingRequest conflict = bookingRequestRepository.lockByBookingRequestId(conflictId)
                 .orElse(null);
             if (conflict == null) {
-            continue;
+                log.warn("Thesis override conflict disappeared before lock: conflictBookingId={}", conflictId);
+                continue;
             }
 
             if (conflict.getStatus() != RequestStatus.PENDING && conflict.getStatus() != RequestStatus.APPROVED) {
-            continue;
+                log.info("Skipping thesis override conflict because status changed: conflictBookingId={}, status={}",
+                        conflictId,
+                        conflict.getStatus());
+                continue;
             }
 
             RequestStatus oldStatus = conflict.getStatus();
@@ -70,6 +84,11 @@ public class ThesisOverrideService {
                     thesisBooking.getBookingRequestId());
 
             updatedConflicts.add(conflict);
+            log.info("Thesis override canceled booking: thesisBookingId={}, conflictBookingId={}, oldStatus={}, participantCount={}",
+                    thesisBooking.getBookingRequestId(),
+                    conflict.getBookingRequestId(),
+                    oldStatus,
+                    participants.size());
         }
 
         if (!updatedConflicts.isEmpty()) {
@@ -78,6 +97,11 @@ public class ThesisOverrideService {
                     .map(BookingRequest::getBookingRequestId)
                     .toList();
             eventPublisher.publishEvent(new BookingCancelledByThesisEvent(thesisBooking.getBookingRequestId(), cancelledIds));
+            log.info("Published thesis override cancellation event: thesisBookingId={}, cancelledIds={}",
+                    thesisBooking.getBookingRequestId(),
+                    cancelledIds);
+        } else {
+            log.info("No thesis override cancellations needed: thesisBookingId={}", thesisBooking.getBookingRequestId());
         }
     }
 }

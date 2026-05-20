@@ -362,6 +362,7 @@ public class AppDataInitializer implements ApplicationRunner {
                     .minMinutesBeforeStartToApprove(15)
                     .studentMinMinutesToBook(60)
                     .lecturerMinMinutesToBook(-15)
+                    .maxPendingBookings(3)
                     .active(true)
                     .build();
             bookingConfigRepo.save(config);

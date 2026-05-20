@@ -22,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -40,6 +41,7 @@ public class NotificationServiceImpl implements NotificationService {
         BOOKING_REJECTED,
         BOOKING_CANCELED,
         BOOKING_SYSTEM_CANCELED,
+        PARTICIPANT_CONFLICT_REQUIRED,
         BOOKING_CANCELLED_BY_THESIS,
         PARTICIPANT_CONFLICT_RESOLVED,
         THESIS_PARTICIPANT_ADDED
@@ -100,7 +102,7 @@ public class NotificationServiceImpl implements NotificationService {
         notificationRepository.markAllAsReadForUser(currentUserId, LocalDateTime.now());
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
     public void handleBookingCreated(Long bookingRequestId, Long actorId) {
         createNotifications(new NotificationCommand(
@@ -113,7 +115,7 @@ public class NotificationServiceImpl implements NotificationService {
         ));
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
     public void handleBookingStatusChanged(Long bookingRequestId, RequestStatus newStatus, Long actorId) {
         NotificationEventKind eventType = switch (newStatus) {
@@ -138,7 +140,20 @@ public class NotificationServiceImpl implements NotificationService {
         ));
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Override
+    public void handleParticipantConflictRequired(Long bookingRequestId, Long participantId, Long userId, Long actorId) {
+        createNotifications(new NotificationCommand(
+                NotificationEventKind.PARTICIPANT_CONFLICT_REQUIRED,
+                bookingRequestId,
+                actorId,
+                participantId,
+                null,
+                null
+        ));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
     public void handleBookingCancelledByThesis(Long thesisBookingRequestId, List<Long> cancelledBookingRequestIds) {
         createNotifications(new NotificationCommand(
@@ -151,7 +166,7 @@ public class NotificationServiceImpl implements NotificationService {
         ));
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
     public void handleParticipantConflictResolved(Long bookingRequestId, Long participantId, Long userId) {
         createNotifications(new NotificationCommand(
@@ -164,7 +179,7 @@ public class NotificationServiceImpl implements NotificationService {
         ));
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Override
     public void handleThesisParticipantAdded(Long bookingRequestId, Long actorId, List<Long> addedParticipantIds) {
         createNotifications(new NotificationCommand(
@@ -190,6 +205,7 @@ public class NotificationServiceImpl implements NotificationService {
             case BOOKING_REJECTED -> handleBookingStatusChanged(message, "REJECTED");
             case BOOKING_CANCELED -> handleBookingStatusChanged(message, "CANCELED");
             case BOOKING_SYSTEM_CANCELED -> handleBookingStatusChanged(message, "SYSTEM_CANCELED");
+            case PARTICIPANT_CONFLICT_REQUIRED -> handleParticipantConflictRequired(message);
             case BOOKING_CANCELLED_BY_THESIS -> handleBookingCancelledByThesis(message);
             case PARTICIPANT_CONFLICT_RESOLVED -> handleParticipantConflictResolved(message);
             case THESIS_PARTICIPANT_ADDED -> handleThesisParticipantAdded(message);
@@ -254,18 +270,6 @@ public class NotificationServiceImpl implements NotificationService {
                             metadataJson,
                             "BOOKING_CREATED:" + booking.getBookingRequestId() + ":" + participantUser.getUserId()
                     );
-                } else if (participant.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION) {
-                    saveNotification(
-                            participantUser,
-                            NotificationType.PARTICIPANT_CONFLICT_REQUIRED,
-                            "Trùng lịch đặt phòng",
-                            "Bạn được thêm vào một booking nhóm nhưng đang trùng lịch. Vui lòng xử lý xung đột.",
-                            booking.getBookingRequestId(),
-                            participant.getBookingParticipantId(),
-                            message.actorId(),
-                            metadataJson,
-                            "PARTICIPANT_CONFLICT_REQUIRED:" + booking.getBookingRequestId() + ":" + participantUser.getUserId() + ":" + participant.getBookingParticipantId()
-                    );
                 }
             }
         } else if (bookingType == BookingType.THESIS) {
@@ -303,6 +307,42 @@ public class NotificationServiceImpl implements NotificationService {
                 }
             }
         }
+    }
+
+    private void handleParticipantConflictRequired(NotificationCommand message) {
+        BookingRequest booking = bookingRequestRepository.findById(message.bookingRequestId())
+                .orElse(null);
+        if (booking == null) {
+            log.warn("BookingRequest not found for id={}", message.bookingRequestId());
+            return;
+        }
+
+        BookingParticipant participant = bookingParticipantRepository.findById(message.participantId())
+                .orElse(null);
+        if (participant == null) {
+            log.warn("BookingParticipant not found for id={}", message.participantId());
+            return;
+        }
+
+        if (participant.getStatus() != ParticipantStatus.PENDING_CONFLICT_RESOLUTION) {
+            log.info("Skipping conflict-required notification because participant status changed: bookingRequestId={}, participantId={}, status={}",
+                    booking.getBookingRequestId(), participant.getBookingParticipantId(), participant.getStatus());
+            return;
+        }
+
+        User participantUser = participant.getUser();
+        String metadataJson = buildMetadataJson(booking);
+        saveNotification(
+                participantUser,
+                NotificationType.PARTICIPANT_CONFLICT_REQUIRED,
+                "Trùng lịch đặt phòng",
+                "Bạn được thêm vào một booking nhóm nhưng đang trùng lịch. Vui lòng xử lý xung đột.",
+                booking.getBookingRequestId(),
+                participant.getBookingParticipantId(),
+                message.actorId(),
+                metadataJson,
+                "PARTICIPANT_CONFLICT_REQUIRED:" + booking.getBookingRequestId() + ":" + participantUser.getUserId() + ":" + participant.getBookingParticipantId()
+        );
     }
 
     private void handleBookingStatusChanged(NotificationCommand message, String statusName) {

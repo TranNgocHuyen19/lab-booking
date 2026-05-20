@@ -202,6 +202,9 @@ public class SystemConfigurationServiceImpl implements SystemConfigurationServic
     @Transactional
     public BookingSystemConfig createBookingSnapshot() {
         BookingSystemConfig current = bookingConfigReadService.getActiveBookingConfig();
+        log.debug("Creating booking config snapshot from active config: activeConfigId={}, maxPendingBookings={}",
+                current.getBookingSystemConfigId(),
+                current.getMaxPendingBookings());
 
         BookingSystemConfig snapshot = BookingSystemConfig.builder()
                 .studentAdvanceDays(current.getStudentAdvanceDays())
@@ -211,10 +214,15 @@ public class SystemConfigurationServiceImpl implements SystemConfigurationServic
                 .minMinutesBeforeStartToApprove(current.getMinMinutesBeforeStartToApprove())
                 .studentMinMinutesToBook(current.getStudentMinMinutesToBook())
                 .lecturerMinMinutesToBook(current.getLecturerMinMinutesToBook())
+                .maxPendingBookings(current.getMaxPendingBookings())
                 .active(true)
                 .build();
 
-        return bookingConfigRepository.save(snapshot);
+        BookingSystemConfig saved = bookingConfigRepository.save(snapshot);
+        log.debug("Booking config snapshot created: snapshotConfigId={}, sourceConfigId={}",
+                saved.getBookingSystemConfigId(),
+                current.getBookingSystemConfigId());
+        return saved;
     }
 
     @Override
@@ -286,6 +294,7 @@ public class SystemConfigurationServiceImpl implements SystemConfigurationServic
                 .minMinutesBeforeStartToApprove(minMinutesBeforeStartToApprove)
                 .studentMinMinutesToBook(studentMinMinutesToBook)
                 .lecturerMinMinutesToBook(lecturerMinMinutesToBook)
+                .maxPendingBookings(current.getMaxPendingBookings())
                 .active(true)
                 .build();
 
@@ -374,6 +383,7 @@ public class SystemConfigurationServiceImpl implements SystemConfigurationServic
                 .minMinutesBeforeStartToApprove(minApprove)
                 .studentMinMinutesToBook(studentMinBook)
                 .lecturerMinMinutesToBook(lecturerMinBook)
+                .maxPendingBookings(current.getMaxPendingBookings())
                 .active(true)
                 .build();
         BookingSystemConfig saved = bookingConfigRepository.save(newConfig);

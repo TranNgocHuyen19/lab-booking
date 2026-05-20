@@ -88,30 +88,96 @@ public class BookingServiceImpl implements BookingService {
     public BookingResponse createBookingV2(CreateBookingRequest request) {
         Long currentUserId = securityUtil.getCurrentUserId();
         BookingCreationContext context = new BookingCreationContext(request, currentUserId);
+        log.info("Creating booking request: requesterId={}, type={}, labRoomId={}, slotCount={}, participantCount={}, deviceCount={}, forceSwitch={}",
+                currentUserId,
+                context.bookingType(),
+                context.labRoomId(),
+                context.slots().size(),
+                context.participants().size(),
+                context.devices().size(),
+                context.forceSwitch());
 
         lockResourcesForCreationV2(context);
+        log.debug("Locked booking resources: requesterId={}, labRoomId={}, slotIds={}, deviceIds={}",
+                currentUserId,
+                context.labRoomId(),
+                context.slotIds(),
+                context.devices().stream().map(CreateBookingDevice::deviceId).sorted().toList());
 
         BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(context.bookingType());
         BookingValidationResult validationResult = strategy.validate(context);
+        log.info("Booking validation completed: requesterId={}, type={}, errorCount={}, existingConflictCount={}, participantConflictCount={}, warningCount={}",
+                currentUserId,
+                context.bookingType(),
+                validationResult.errors().size(),
+                validationResult.existingScheduleConflicts().size(),
+                validationResult.participantConflicts().size(),
+                validationResult.warnings().size());
 
         if (validationResult.hasErrors()) {
+            log.warn("Booking validation failed: requesterId={}, type={}, errorCount={}",
+                    currentUserId,
+                    context.bookingType(),
+                    validationResult.errors().size());
             throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
         }
 
         if (!validationResult.existingScheduleConflicts().isEmpty()) {
             if (context.forceSwitch()) {
+                log.info("Force switch requested: requesterId={}, conflictCount={}",
+                        currentUserId,
+                        validationResult.existingScheduleConflicts().size());
                 cancelOrLeaveConflictingBookings(currentUserId, validationResult.existingScheduleConflicts());
             } else {
+                log.warn("Existing schedule conflict requires confirmation: requesterId={}, conflictCount={}",
+                        currentUserId,
+                        validationResult.existingScheduleConflicts().size());
                 throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
             }
         }
 
         BookingRequest bookingRequest = strategy.create(context, validationResult);
+        log.info("Booking persisted: bookingRequestId={}, requesterId={}, type={}, status={}",
+                bookingRequest.getBookingRequestId(),
+                currentUserId,
+                bookingRequest.getBookingType(),
+                bookingRequest.getStatus());
         strategy.afterCreated(bookingRequest, context);
 
         eventPublisher.publishEvent(new BookingCreatedEvent(bookingRequest.getBookingRequestId(), currentUserId));
+        log.info("Published booking created event: bookingRequestId={}, requesterId={}",
+                bookingRequest.getBookingRequestId(),
+                currentUserId);
+        publishParticipantConflictRequiredEvents(bookingRequest, currentUserId);
 
         return bookingCreationResponseMapper.toResponse(bookingRequest, validationResult);
+    }
+
+    private void publishParticipantConflictRequiredEvents(BookingRequest bookingRequest, Long actorId) {
+        List<BookingParticipant> pendingParticipants = bookingRequest.getParticipants().stream()
+                .filter(participant -> participant.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION)
+                .sorted(Comparator.comparing(BookingParticipant::getBookingParticipantId))
+                .toList();
+
+        if (pendingParticipants.isEmpty()) {
+            log.info("No participant conflict-required events to publish: bookingRequestId={}",
+                    bookingRequest.getBookingRequestId());
+            return;
+        }
+
+        for (BookingParticipant participant : pendingParticipants) {
+            eventPublisher.publishEvent(new ParticipantConflictRequiredEvent(
+                    bookingRequest.getBookingRequestId(),
+                    participant.getBookingParticipantId(),
+                    participant.getUser().getUserId(),
+                    actorId
+            ));
+            log.info("Published participant conflict-required event: bookingRequestId={}, participantId={}, userId={}, actorId={}",
+                    bookingRequest.getBookingRequestId(),
+                    participant.getBookingParticipantId(),
+                    participant.getUser().getUserId(),
+                    actorId);
+        }
     }
 
     private void cancelOrLeaveConflictingBookings(Long userId, List<ExistingScheduleConflictResult> conflicts) {
@@ -122,11 +188,13 @@ public class BookingServiceImpl implements BookingService {
         List<Long> sortedIds = conflictingBookingRequestIds.stream()
                 .sorted()
                 .toList();
+        log.info("Resolving force-switch conflicts: userId={}, bookingIds={}", userId, sortedIds);
 
         for (Long bookingId : sortedIds) {
             BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingId)
                     .orElse(null);
             if (booking == null) {
+                log.warn("Force-switch conflict booking not found after lock: bookingId={}", bookingId);
                 continue;
             }
 
@@ -139,6 +207,10 @@ public class BookingServiceImpl implements BookingService {
                 if (oldStatus == RequestStatus.PENDING || oldStatus == RequestStatus.APPROVED) {
                     booking.setStatus(RequestStatus.CANCELED);
                     bookingRequestRepository.save(booking);
+                    log.info("Force-switch canceled personal booking: bookingId={}, userId={}, oldStatus={}",
+                            bookingId,
+                            userId,
+                            oldStatus);
 
                     bookingSlotAttendanceRepository.deleteByBookingRequest(booking);
 
@@ -160,6 +232,10 @@ public class BookingServiceImpl implements BookingService {
                 }
                 participant.setStatus(ParticipantStatus.CANCELLED);
                 bookingParticipantRepository.save(participant);
+                log.info("Force-switch canceled group participant: bookingId={}, participantId={}, userId={}",
+                        bookingId,
+                        participant.getBookingParticipantId(),
+                        userId);
 
                 bookingSlotAttendanceRepository.deleteByBookingRequestAndBookingParticipant(booking, participant);
             }

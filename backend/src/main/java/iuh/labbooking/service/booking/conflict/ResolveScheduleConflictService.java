@@ -10,6 +10,7 @@ import iuh.labbooking.exception.AppException;
 import iuh.labbooking.exception.ErrorCode;
 import iuh.labbooking.model.BookingParticipant;
 import iuh.labbooking.model.BookingRequest;
+import iuh.labbooking.model.SlotBooking;
 import iuh.labbooking.repository.BookingParticipantRepository;
 import iuh.labbooking.repository.BookingRequestRepository;
 import iuh.labbooking.repository.BookingSlotAttendanceRepository;
@@ -21,6 +22,7 @@ import iuh.labbooking.enums.CheckinStatus;
 import iuh.labbooking.enums.CheckoutStatus;
 import iuh.labbooking.event.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,17 +31,24 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ResolveScheduleConflictService {
 
     private final BookingRequestRepository bookingRequestRepository;
     private final BookingParticipantRepository bookingParticipantRepository;
     private final BookingHistoryService bookingHistoryService;
     private final BookingSlotAttendanceRepository bookingSlotAttendanceRepository;
+    private final BookingConflictQueryService conflictQueryService;
     private final SystemConfigurationService configService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void resolveParticipantConflict(Long currentUserId, Long participantId, ResolveParticipantConflictRequest request) {
+        log.info("Resolving participant schedule conflict: userId={}, participantId={}, action={}, conflictingBookingRequestId={}",
+                currentUserId,
+                participantId,
+                request.action(),
+                request.conflictingBookingRequestId());
         BookingParticipant participant = bookingParticipantRepository.lockByBookingParticipantId(participantId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_A_PARTICIPANT));
 
@@ -57,6 +66,10 @@ public class ResolveScheduleConflictService {
         if (request.action() == ScheduleConflictAction.KEEP_EXISTING_BOOKING) {
             participant.setStatus(ParticipantStatus.DECLINED);
             bookingParticipantRepository.save(participant);
+            log.info("Participant kept existing booking and declined group booking: userId={}, participantId={}, groupBookingId={}",
+                    currentUserId,
+                    participantId,
+                    groupBooking.getBookingRequestId());
             eventPublisher.publishEvent(new ParticipantConflictResolvedEvent(
                     groupBooking.getBookingRequestId(),
                     participantId,
@@ -66,13 +79,10 @@ public class ResolveScheduleConflictService {
             return;
         }
 
-        if (request.conflictingBookingRequestId() == null) {
-            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
-        }
-
-        BookingRequest conflictingPersonalBooking = bookingRequestRepository
-                .lockByBookingRequestId(request.conflictingBookingRequestId())
-                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+        BookingRequest conflictingPersonalBooking = findConflictingPersonalBooking(
+                currentUserId,
+                groupBooking,
+                request.conflictingBookingRequestId());
 
         if (conflictingPersonalBooking.getBookingType() != BookingType.PERSONAL
                 || !conflictingPersonalBooking.getRequester().getUserId().equals(currentUserId)
@@ -83,6 +93,11 @@ public class ResolveScheduleConflictService {
         RequestStatus oldStatus = conflictingPersonalBooking.getStatus();
         conflictingPersonalBooking.setStatus(RequestStatus.CANCELED);
         bookingRequestRepository.save(conflictingPersonalBooking);
+        log.info("Canceled conflicting personal booking for participant switch: userId={}, personalBookingId={}, oldStatus={}, groupBookingId={}",
+                currentUserId,
+                conflictingPersonalBooking.getBookingRequestId(),
+                oldStatus,
+                groupBooking.getBookingRequestId());
 
         bookingSlotAttendanceRepository.deleteByBookingRequest(conflictingPersonalBooking);
 
@@ -102,6 +117,10 @@ public class ResolveScheduleConflictService {
 
         participant.setStatus(ParticipantStatus.CONFIRMED);
         bookingParticipantRepository.save(participant);
+        log.info("Participant confirmed into group booking after conflict switch: userId={}, participantId={}, groupBookingId={}",
+                currentUserId,
+                participantId,
+                groupBooking.getBookingRequestId());
 
         if (groupBooking.getStatus() == RequestStatus.APPROVED) {
             boolean exists = bookingSlotAttendanceRepository
@@ -116,6 +135,13 @@ public class ResolveScheduleConflictService {
                         .checkoutStatus(CheckoutStatus.NOT_CHECKED_OUT)
                         .build();
                 bookingSlotAttendanceRepository.save(attendance);
+                log.info("Created attendance record for switched participant: groupBookingId={}, participantId={}",
+                        groupBooking.getBookingRequestId(),
+                        participantId);
+            } else {
+                log.debug("Attendance already exists for switched participant: groupBookingId={}, participantId={}",
+                        groupBooking.getBookingRequestId(),
+                        participantId);
             }
         }
 
@@ -125,5 +151,43 @@ public class ResolveScheduleConflictService {
                 currentUserId,
                 request.action()
         ));
+        log.info("Published participant conflict resolved event: groupBookingId={}, participantId={}, userId={}, action={}",
+                groupBooking.getBookingRequestId(),
+                participantId,
+                currentUserId,
+                request.action());
+    }
+
+    private BookingRequest findConflictingPersonalBooking(
+            Long currentUserId,
+            BookingRequest groupBooking,
+            Long requestedConflictBookingId) {
+        if (requestedConflictBookingId != null) {
+            return bookingRequestRepository
+                    .lockByBookingRequestId(requestedConflictBookingId)
+                    .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+        }
+
+        if (groupBooking.getSlotBookings() == null || groupBooking.getSlotBookings().isEmpty()) {
+            throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
+        }
+
+        for (SlotBooking slotBooking : groupBooking.getSlotBookings()) {
+            if (slotBooking.getBookingDate() == null || slotBooking.getSlot() == null) {
+                continue;
+            }
+
+            List<BookingRequest> conflicts = conflictQueryService.findActivePersonalBookingsForUser(
+                    currentUserId,
+                    slotBooking.getBookingDate(),
+                    List.of(slotBooking.getSlot().getSlotId()));
+            if (!conflicts.isEmpty()) {
+                return bookingRequestRepository
+                        .lockByBookingRequestId(conflicts.getFirst().getBookingRequestId())
+                        .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+            }
+        }
+
+        throw new AppException(ErrorCode.BOOKING_NOT_FOUND);
     }
 }

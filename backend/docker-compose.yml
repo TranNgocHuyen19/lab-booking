@@ -1,25 +1,25 @@
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: lab_booking_backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/labbooking
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: 6379
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./uploads:/app/uploads
-    restart: unless-stopped
+#  backend:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: lab_booking_backend
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#    env_file:
+#      - .env
+#    environment:
+#      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/labbooking
+#      SPRING_DATA_REDIS_HOST: redis
+#      SPRING_DATA_REDIS_PORT: 6379
+#    ports:
+#      - "8080:8080"
+#    volumes:
+#      - ./uploads:/app/uploads
+#    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
@@ -29,7 +29,7 @@ services:
       POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-123}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - lab_booking_pgdata:/var/lib/postgresql/data
       - ./src/main/resources/db/booking_sample_data.sql:/docker-entrypoint-initdb.d/10_booking_sample_data.sql:ro
