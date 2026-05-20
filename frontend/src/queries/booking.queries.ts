@@ -4,7 +4,8 @@ import type {
   CreateBookingRequest,
   UpdateBookingRequest,
   CancelBookingRequest,
-  BookingStatusRequest
+  BookingStatusRequest,
+  ResolveParticipantConflictRequest
 } from '@/schemas/booking.schema'
 import { createQuery, createMutation, QUERY_KEYS, QUERY_POLICIES } from '@/query-core'
 
@@ -112,12 +113,13 @@ export const useCreateBookingMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ROOM_STATISTICS.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_BOOKING_STATISTICS.ROOT })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_BOOKING_STATISTICS.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.NOTIFICATION.ROOT })
       ])
     }
   })()
@@ -131,7 +133,7 @@ export const useUpdateBookingMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -150,7 +152,7 @@ export const useApproveBookingMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -169,7 +171,7 @@ export const useRejectBookingMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -188,12 +190,29 @@ export const useCancelBookingMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ROOM_STATISTICS.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_BOOKING_STATISTICS.ROOT })
+      ])
+    }
+  })()
+}
+
+export const useResolveParticipantConflictMutation = () => {
+  const queryClient = useQueryClient()
+  return createMutation({
+    mutationFn: ({ participantId, data }: { participantId: number; data: ResolveParticipantConflictRequest }) =>
+      bookingService.resolveParticipantConflict(participantId, data),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.NOTIFICATION.ROOT })
       ])
     }
   })()
@@ -208,7 +227,7 @@ export const useAddParticipantsMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -227,7 +246,7 @@ export const useSystemCancelBookingMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -247,7 +266,7 @@ export const useBulkApproveBookingsMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -267,7 +286,7 @@ export const useBulkRejectBookingsMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),
@@ -287,7 +306,7 @@ export const useBulkSystemCancelBookingsMutation = () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BOOKING.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_BOOKING.ROOT }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.SCHEDULE_ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ATTENDANCE.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD.ROOT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LECTURER_DASHBOARD.ROOT }),

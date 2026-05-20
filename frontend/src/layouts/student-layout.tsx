@@ -29,6 +29,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Role } from '@/constants/types'
 import ChangePasswordModal from '@/components/common/dialog-change-password'
 import { UserAvatar } from '@/components/common/user-avatar'
+import { NotificationPopover } from '@/components/common/notification-popover'
 
 interface NavItem {
   to: string
@@ -178,6 +179,7 @@ const StudentLayout = ({ user }: StudentLayoutProps) => {
                       {user.role === Role.STUDENT ? 'Sinh viên' : 'Giảng viên'}
                     </div>
                   </div>
+                  <NotificationPopover user={user} />
                   <DropdownAvatar />
                 </div>
               ) : (
@@ -192,6 +194,12 @@ const StudentLayout = ({ user }: StudentLayoutProps) => {
             </div>
 
             <div className='flex items-center gap-2 xl:border-l xl:border-gray-200 xl:pl-4'>
+              {user && (
+                <NotificationPopover
+                  user={user}
+                  buttonClassName='xl:hidden bg-white/10 text-white hover:bg-white/20 hover:text-white'
+                />
+              )}
               <Sheet>
                 <SheetTrigger asChild>
                   <Button

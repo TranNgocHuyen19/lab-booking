@@ -46,6 +46,16 @@ export const CreateBookingRequestSchema = z.object({
 
 export type CreateBookingRequest = z.infer<typeof CreateBookingRequestSchema>
 
+export const ScheduleConflictActionSchema = z.enum(['KEEP_EXISTING_BOOKING', 'SWITCH_TO_NEW_BOOKING'])
+
+export const ResolveParticipantConflictRequestSchema = z.object({
+  action: ScheduleConflictActionSchema,
+  conflictingBookingRequestId: z.number().nullable().optional()
+})
+
+export type ScheduleConflictAction = z.infer<typeof ScheduleConflictActionSchema>
+export type ResolveParticipantConflictRequest = z.infer<typeof ResolveParticipantConflictRequestSchema>
+
 export const RequestStatusSchema = z.enum([
   'PENDING',
   'APPROVED',

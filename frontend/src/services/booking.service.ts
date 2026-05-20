@@ -5,6 +5,7 @@ import type {
   CreateBookingRequest,
   CancelBookingRequest,
   BookingStatusRequest,
+  ResolveParticipantConflictRequest,
   PaginatedParticipantResponse,
   PaginatedBookingParticipantResponse,
   PaginatedSecureBookingResponse,
@@ -53,6 +54,8 @@ const bookingService = {
     http.patch<ApiResponse<BookingResponse>>(`/bookings/${id}`, body),
   cancel: (id: number, body?: CancelBookingRequest) =>
     http.post<ApiResponse<BookingResponse>>(`/bookings/${id}`, { data: body }),
+  resolveParticipantConflict: (participantId: number, body: ResolveParticipantConflictRequest) =>
+    http.post<ApiResponse<void>>(`/bookings/participants/${participantId}/resolve-conflict`, body),
   approve: (id: number, body?: BookingStatusRequest) =>
     http.post<ApiResponse<SecureBookingResponse>>(`/bookings/${id}/approve`, body || {}),
   reject: (id: number, body: BookingStatusRequest) =>

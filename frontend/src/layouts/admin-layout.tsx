@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Outlet, NavLink, Navigate, useLocation } from 'react-router'
 import DropdownAvatar from '@/components/common/dropdown-avatar'
-import { GraduationCap, ChevronLeft, ChevronRight, Bell, ChevronDown } from 'lucide-react'
+import { GraduationCap, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { type UserResponse } from '@/schemas/user.schema'
 import { cn } from '@/lib/utils'
 import { PATHS } from '@/constants/paths'
 import { Role } from '@/constants/types'
 import { NAV_ITEMS, type NavItem } from '@/constants/nav-items'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { NotificationPopover } from '@/components/common/notification-popover'
 
 interface AdminLayoutProps {
   user: UserResponse
@@ -121,12 +122,7 @@ const AdminLayout = ({ user }: AdminLayoutProps) => {
           </div>
 
           <div className='flex items-center gap-4'>
-            <button className='relative flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-all hover:bg-gray-200'>
-              <Bell className='h-5 w-5' />
-              <span className='absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white'>
-                3
-              </span>
-            </button>
+            <NotificationPopover user={user} />
 
             <div className='flex items-center gap-3'>
               <div className='hidden text-right md:block'>

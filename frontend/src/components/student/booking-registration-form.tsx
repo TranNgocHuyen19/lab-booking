@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Users, Loader2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
 import { InfiniteScrollSelect } from '@/components/common/infinite-scroll-select'
 import { useGroupMembersQuery } from '@/queries/research-group.queries'
 import { useCreateBookingMutation } from '@/queries/booking.queries'
@@ -15,7 +14,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { QUERY_KEYS } from '@/query-core'
 import { DuplicateConfirmDialog } from '@/components/common/duplicate-confirm-dialog'
 import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { SlotResponse } from '@/schemas/slot.schema'
@@ -47,7 +45,6 @@ export const StudentBookingForm = ({
   onCancel,
   onSuccess
 }: StudentBookingFormProps) => {
-  const queryClient = useQueryClient()
   const [bookingType, setBookingType] = useState<'individual' | 'group'>('individual')
   const [selectedGroup, setSelectedGroup] = useState<string>('')
 
@@ -60,7 +57,6 @@ export const StudentBookingForm = ({
   const finishBookingCreation = () => {
     setWarningDialog(null)
     onSuccess()
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT })
   }
 
   const { data: members, isLoading: isLoadingMembers } = useGroupMembersQuery(

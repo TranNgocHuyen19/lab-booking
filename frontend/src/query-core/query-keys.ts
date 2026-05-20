@@ -20,6 +20,7 @@ export const QUERY_KEYS = {
   LAB_ROOM: {
     ROOT: ['lab-room'] as const,
     LIST: (params: unknown) => ['lab-room', 'list', params] as const,
+    SCHEDULE_ROOT: ['lab-room', 'schedule'] as const,
     SCHEDULE: (params: unknown) => ['lab-room', 'schedule', params] as const
   },
 
@@ -160,5 +161,11 @@ export const QUERY_KEYS = {
     ATTENDANCE_HISTORY: ['system-config', 'attendance-history'] as const,
     BOOKING_HISTORY: ['system-config', 'booking-history'] as const,
     ALL_HISTORY: ['system-config', 'all-history'] as const
+  },
+
+  NOTIFICATION: {
+    ROOT: ['notification'] as const,
+    LIST: (params: unknown) => ['notification', 'list', params] as const,
+    UNREAD_COUNT: ['notification', 'unread-count'] as const
   }
 } as const

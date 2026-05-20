@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { CheckCircle2, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useQueries, useQueryClient } from '@tanstack/react-query'
+import { useQueries } from '@tanstack/react-query'
 import { InfiniteScrollMultipleSelect } from '@/components/common/infinite-scroll-multiple-select'
 import { researchGroupService } from '@/services/research-group.service'
 import { useDeviceAvailabilityQuery } from '@/queries/device.queries'
@@ -24,7 +24,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { QUERY_KEYS } from '@/query-core'
 import { DuplicateConfirmDialog } from '@/components/common/duplicate-confirm-dialog'
 import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { MemberInfoResponse, SecureResearchGroupResponse } from '@/schemas/research-group.schema'
@@ -56,7 +55,6 @@ export const LecturerBookingForm = ({
   onCancel,
   onSuccess
 }: LecturerBookingFormProps) => {
-  const queryClient = useQueryClient()
   const [selectedGroups, setSelectedGroups] = useState<string[]>([])
   const [auditingParticipants, setAuditingParticipants] = useState<AuditingParticipant[]>([])
   const [purpose, setPurpose] = useState<string>('')
@@ -67,7 +65,6 @@ export const LecturerBookingForm = ({
   const finishBookingCreation = () => {
     setWarningDialog(null)
     onSuccess()
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LAB_ROOM.ROOT })
   }
 
   const { data: devicesAvailabilityRes, isLoading: isLoadingDevicesAvailability } = useDeviceAvailabilityQuery({

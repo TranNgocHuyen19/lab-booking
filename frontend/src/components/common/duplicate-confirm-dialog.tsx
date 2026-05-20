@@ -58,33 +58,35 @@ export const DuplicateConfirmDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='w-[95vw] max-w-3xl bg-white border-2 border-amber-100 shadow-2xl p-0 overflow-hidden rounded-2xl'>
-        <div className='p-7'>
+      <DialogContent className='sm:max-w-[600px] p-0 overflow-hidden rounded-xl border-none bg-white shadow-2xl'>
+        <div className='p-8 pb-5'>
           <DialogHeader>
-            <div className='mx-auto bg-amber-50 w-20 h-20 rounded-full flex items-center justify-center mb-4 border border-amber-100'>
-              <AlertCircle className='h-11 w-11 text-amber-500' />
+            <div className='mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl border border-amber-100 bg-amber-50'>
+              <AlertCircle className='h-9 w-9 text-amber-500' />
             </div>
-            <DialogTitle className='text-[32px] font-extrabold text-center text-gray-800 leading-tight'>
+            <DialogTitle className='mx-auto text-center text-2xl font-black leading-tight tracking-tight text-gray-900'>
               {title}
             </DialogTitle>
             <DialogDescription className='text-center pt-2'>
-              <span className='block text-lg text-gray-600 mb-5'>{description}</span>
-              <div className='bg-slate-50 rounded-xl p-5 border border-slate-200 max-h-[360px] overflow-y-auto custom-scrollbar'>
+              <span className='mx-auto mb-4 block text-sm font-medium leading-6 text-gray-600'>
+                {description}
+              </span>
+              <div className='max-h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4 custom-scrollbar'>
                 {hasConflictDetails ? (
-                  <ul className='space-y-4 text-left'>
+                  <ul className='space-y-3 text-left'>
                     {conflictDetails.map((item, index) => (
                       <li key={index} className='rounded-xl border border-amber-100 bg-white p-4 shadow-sm'>
                         <div className='flex items-start gap-3'>
-                          <UserX className='h-5 w-5 shrink-0 text-amber-600 mt-0.5' />
-                          <div className='min-w-0 space-y-1.5'>
-                            <div className='text-lg font-bold text-gray-900'>{item.title}</div>
+                          <UserX className='mt-0.5 h-5 w-5 shrink-0 text-amber-600' />
+                          <div className='min-w-0 flex-1 space-y-1.5'>
+                            <div className='text-base font-bold text-gray-900'>{item.title}</div>
                             {item.room ||
                             item.date ||
                             item.slot ||
                             item.bookingTypeLabel ||
                             item.devicesText ||
                             item.devicesList ? (
-                              <div className='space-y-1 text-sm text-gray-600'>
+                              <div className='space-y-1 text-sm leading-5 text-gray-600'>
                                 {item.room && (
                                   <div>
                                     <span className='font-semibold text-gray-700'>Phòng:</span> {item.room}
@@ -137,7 +139,9 @@ export const DuplicateConfirmDialog = ({
                                 Trạng thái tạm thời: <span className='font-semibold'>{item.status}</span>
                               </div>
                             )}
-                            {item.instruction && <div className='text-sm text-gray-500'>{item.instruction}</div>}
+                            {item.instruction && (
+                              <div className='text-sm leading-5 text-gray-500'>{item.instruction}</div>
+                            )}
                           </div>
                         </div>
                       </li>
@@ -146,7 +150,7 @@ export const DuplicateConfirmDialog = ({
                 ) : (
                   <ul className='space-y-2'>
                     {conflictingUsers.map((user, index) => (
-                      <li key={index} className='flex items-center gap-2 text-sm text-amber-700 font-semibold'>
+                      <li key={index} className='flex items-center gap-2 text-sm font-semibold text-amber-700'>
                         <UserX className='h-4 w-4 shrink-0 text-amber-600' />
                         <span>{user}</span>
                       </li>
@@ -154,18 +158,18 @@ export const DuplicateConfirmDialog = ({
                   </ul>
                 )}
               </div>
-              <span className='block mt-5 text-gray-500 text-sm leading-relaxed italic'>{note}</span>
+              <span className='mx-auto mt-4 block text-sm leading-6 text-gray-500 italic'>{note}</span>
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        <DialogFooter className='bg-slate-50 p-5 flex gap-3 sm:justify-center border-t border-slate-100'>
+        <DialogFooter className='flex gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:justify-center'>
           {showCancel && (
             <Button
               variant='outline'
               disabled={confirmLoading}
               onClick={() => onOpenChange(false)}
-              className='flex-1 h-12 border-gray-300 hover:bg-white hover:text-gray-900 font-bold uppercase text-sm'
+              className='h-12 flex-1 rounded-xl border-gray-300 text-sm font-bold uppercase hover:bg-white hover:text-gray-900'
             >
               {cancelLabel}
             </Button>
@@ -178,7 +182,7 @@ export const DuplicateConfirmDialog = ({
                 onOpenChange(false)
               }
             }}
-            className='flex-1 h-12 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase text-sm shadow-md shadow-amber-200'
+            className='h-12 flex-1 rounded-xl bg-amber-600 text-sm font-bold uppercase text-white shadow-md shadow-amber-200 hover:bg-amber-700'
           >
             {confirmLoading ? (
               <span className='inline-flex items-center gap-2'>
