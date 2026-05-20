@@ -156,6 +156,7 @@ public enum ErrorCode {
     USER_HAS_PENDING_GROUP_INVITATION(2635, "User has a pending group invitation or conflict-resolution booking in the same date and slot", HttpStatus.OK),
     DUPLICATED_SLOT_IN_REQUEST(2636, "Booking request contains duplicated date and slot", HttpStatus.BAD_REQUEST),
     BOOKING_MULTIPLE_DATES_NOT_ALLOWED(2637, "Booking request can only contain slots in the same date", HttpStatus.BAD_REQUEST),
+    CANNOT_APPROVE_OWN_BOOKING(2638, "Cannot approve or reject your own booking request", HttpStatus.FORBIDDEN),
 
     // ==================== ENTITY: ATTENDANCE (2700-2799) ====================
     ATTENDANCE_NOT_FOUND(2700, "Attendance record not found", HttpStatus.NOT_FOUND),

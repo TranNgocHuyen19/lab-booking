@@ -558,6 +558,8 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.BOOKING_CANNOT_APPROVE);
         }
 
+        validateApprovalAuthority(booking, approver);
+
         BookingCreationContext context = buildCreationContextFromBookingRequest(booking);
         BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(booking.getBookingType());
         BookingValidationResult validationResult = strategy.validate(context);
@@ -639,6 +641,8 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != RequestStatus.PENDING) {
             throw new AppException(ErrorCode.BOOKING_CANNOT_REJECT);
         }
+
+        validateApprovalAuthority(booking, approver);
 
         RequestStatus oldStatus = booking.getStatus();
         booking.setStatus(RequestStatus.REJECTED);
@@ -1197,6 +1201,40 @@ public class BookingServiceImpl implements BookingService {
         );
 
         return new BookingCreationContext(request, booking.getRequester().getUserId());
+    }
+
+    private void validateApprovalAuthority(BookingRequest booking, User approver) {
+        if (!securityUtil.isAdmin()) {
+            if (booking.getRequester().getUserId().equals(approver.getUserId())) {
+                throw new AppException(ErrorCode.CANNOT_APPROVE_OWN_BOOKING);
+            }
+            if (securityUtil.isLecturer()) {
+                if (booking.getBookingType() != BookingType.GROUP) {
+                    throw new AppException(ErrorCode.UNAUTHORIZED);
+                }
+                Set<ResearchGroup> groups = booking.getResearchGroup();
+                if (groups == null || groups.isEmpty()) {
+                    throw new AppException(ErrorCode.NOT_GROUP_LEADER);
+                }
+                boolean isLeaderOrCoLeader = false;
+                for (ResearchGroup group : groups) {
+                    boolean roleMatch = groupMembershipRepository.findByResearchGroup_ResearchGroupIdAndUser_UserId(
+                            group.getResearchGroupId(), approver.getUserId())
+                            .map(gm -> gm.getRole() == MemberRole.LEADER || gm.getRole() == MemberRole.CO_LEADER)
+                            .orElse(false);
+                    boolean isCreator = group.getCreator() != null && group.getCreator().getUserId().equals(approver.getUserId());
+                    if (roleMatch || isCreator) {
+                        isLeaderOrCoLeader = true;
+                        break;
+                    }
+                }
+                if (!isLeaderOrCoLeader) {
+                    throw new AppException(ErrorCode.NOT_GROUP_LEADER);
+                }
+            } else {
+                throw new AppException(ErrorCode.UNAUTHORIZED);
+            }
+        }
     }
 }
 
