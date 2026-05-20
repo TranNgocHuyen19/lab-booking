@@ -32,12 +32,16 @@ public class BookingConflictQueryService {
     private final BookingRequestRepository bookingRequestRepository;
 
     public boolean userHasActivePersonalBooking(Long userId, LocalDate date, List<Long> slotIds) {
-        return bookingParticipantRepository.existsPersonalBookingForUser(
+        return !findActivePersonalBookingsForUser(userId, date, slotIds).isEmpty();
+    }
+
+    public List<BookingRequest> findActivePersonalBookingsForUser(Long userId, LocalDate date, List<Long> slotIds) {
+        return bookingRequestRepository.findActiveBookingsByUserDateSlotsAndType(
                 userId,
                 date,
                 slotIds,
-                ACTIVE_BOOKING_STATUSES,
-                List.of(ParticipantStatus.CONFIRMED));
+                BookingType.PERSONAL,
+                ACTIVE_BOOKING_STATUSES);
     }
 
     public boolean userHasConfirmedGroupBooking(Long userId, LocalDate date, List<Long> slotIds) {

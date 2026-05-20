@@ -24,6 +24,7 @@ import iuh.labbooking.mapper.BookingStatusHistoryMapper;
 import iuh.labbooking.mapper.UserMapper;
 import iuh.labbooking.model.*;
 import iuh.labbooking.repository.*;
+import iuh.labbooking.service.booking.conflict.BookingConflictQueryService;
 import iuh.labbooking.service.booking.strategy.BookingCreationStrategy;
 import iuh.labbooking.service.booking.strategy.BookingStrategyFactory;
 import iuh.labbooking.service.booking.validation.BookingValidationResult;
@@ -31,7 +32,6 @@ import iuh.labbooking.service.booking.validation.BookingValidationResult.Existin
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
 import iuh.labbooking.service.researchgroup.ResearchGroupService;
 import iuh.labbooking.service.user.UserService;
-import iuh.labbooking.util.RoleUtil;
 import iuh.labbooking.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -125,6 +125,10 @@ public class BookingServiceImpl implements BookingService {
             }
 
             if (booking.getBookingType() == BookingType.PERSONAL) {
+                if (!booking.getRequester().getUserId().equals(userId)) {
+                    throw new AppException(ErrorCode.BOOKING_NOT_ALLOWED);
+                }
+
                 RequestStatus oldStatus = booking.getStatus();
                 if (oldStatus == RequestStatus.PENDING || oldStatus == RequestStatus.APPROVED) {
                     booking.setStatus(RequestStatus.CANCELED);
@@ -141,12 +145,13 @@ public class BookingServiceImpl implements BookingService {
                 User user = userRepository.findById(userId)
                         .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
                 BookingParticipant participant = bookingParticipantRepository
-                        .findByBookingRequestAndUser(booking, user)
-                        .orElse(null);
-                if (participant != null && participant.getStatus() == ParticipantStatus.CONFIRMED) {
-                    participant.setStatus(ParticipantStatus.CANCELLED);
-                    bookingParticipantRepository.save(participant);
+                        .lockByBookingRequestAndUser(booking, user)
+                        .orElseThrow(() -> new AppException(ErrorCode.NOT_A_PARTICIPANT));
+                if (participant.getStatus() != ParticipantStatus.CONFIRMED) {
+                    throw new AppException(ErrorCode.NOT_A_PARTICIPANT);
                 }
+                participant.setStatus(ParticipantStatus.CANCELLED);
+                bookingParticipantRepository.save(participant);
             }
         }
     }
@@ -233,62 +238,6 @@ public class BookingServiceImpl implements BookingService {
         return buildBookingResponse(updatedBooking, securityUtil.getCurrentUser());
     }
 
-    private void validateBookingAdvanceDate(LocalDate bookingDate, User user, BookingSystemConfig config) {
-        String roleName = user.getRole().getRoleName();
-        int maxAdvanceDays;
-
-        switch (roleName) {
-            case "STUDENT" -> maxAdvanceDays = config.getStudentAdvanceDays();
-            case "LECTURER" -> maxAdvanceDays = config.getLecturerAdvanceDays();
-            case "ADMIN" -> maxAdvanceDays = config.getAdminAdvanceDays();
-            default -> maxAdvanceDays = 0;
-        }
-
-        if (maxAdvanceDays <= 0) {
-            throw new AppException(ErrorCode.BOOKING_ROLE_NOT_ALLOWED);
-        }
-
-        long daysBetween = LocalDate.now().until(bookingDate).getDays();
-
-        if (daysBetween > maxAdvanceDays) {
-            throw new AppException(ErrorCode.BOOKING_TOO_FAR_IN_ADVANCE, Map.of(
-                    "maxAdvanceDays", maxAdvanceDays,
-                    "requestedDays", daysBetween,
-                    "role", roleName
-            ));
-        }
-    }
-
-    private void validateBookingTimeWindow(LocalDate bookingDate, List<Slot> slots, User user, BookingSystemConfig config) {
-        LocalDateTime now = LocalDateTime.now();
-
-        Integer limitMinutes;
-        String role = user.getRole().getRoleName();
-
-        if (RoleUtil.isStudent(role)) {
-            limitMinutes = config.getStudentMinMinutesToBook();
-        } else if ("LECTURER".equals(role)) {
-            limitMinutes = config.getLecturerMinMinutesToBook();
-        } else {
-            return;
-        }
-
-        Slot firstSlot = slots.stream()
-                .min(Comparator.comparing(Slot::getStartTime))
-                .orElseThrow(() -> new AppException(ErrorCode.SLOT_NOT_FOUND));
-
-        LocalDateTime startTime = LocalDateTime.of(bookingDate, firstSlot.getStartTime());
-        long minutesUntilStart = Duration.between(now, startTime).toMinutes();
-
-        if (minutesUntilStart < limitMinutes) {
-            throw new AppException(ErrorCode.BOOKING_CREATION_TIME_INVALID, Map.of(
-                    "limitMinutes", limitMinutes,
-                    "minutesUntilStart", minutesUntilStart,
-                    "role", role
-            ));
-        }
-    }
-
     private void validateNoDuplicateBookings(
             List<AddParticipantRequest> participants,
             LocalDate bookingDate,
@@ -317,65 +266,6 @@ public class BookingServiceImpl implements BookingService {
                     .map(u -> u.getFullName() + " (" + u.getUsername() + ")")
                     .toList();
             throw new AppException(ErrorCode.USER_ALREADY_BOOKED_IN_TIME_SLOT, conflictingNames);
-        }
-    }
-
-    private void validateSlotsAvailability(
-            LabRoom labRoom,
-            List<Slot> slots,
-            LocalDate bookingDate,
-            BookingType newBookingType,
-            int newParticipantCount) {
-        List<Long> slotIds = slots.stream().map(Slot::getSlotId).toList();
-
-        List<Object[]> results = slotBookingRepository
-                .countActiveParticipantsBySlots(
-                        labRoom.getLabRoomId(),
-                        bookingDate,
-                        slotIds,
-                        ParticipantStatus.CONFIRMED,
-                        List.of(RequestStatus.PENDING, RequestStatus.APPROVED));
-
-        Map<Long, Integer> activeCountBySlot = results.stream()
-                .collect(Collectors.toMap(
-                        r -> (Long) r[0],
-                        r -> ((Long) r[1]).intValue()));
-
-        List<Object[]> thesisResults = slotBookingRepository
-                .findThesisBookingsBySlots(
-                        labRoom.getLabRoomId(),
-                        bookingDate,
-                        slotIds,
-                        List.of(RequestStatus.PENDING, RequestStatus.APPROVED));
-
-        Set<Long> slotsWithThesis = thesisResults.stream()
-                .map(r -> (Long) r[0])
-                .collect(Collectors.toSet());
-
-        for (Slot slot : slots) {
-            Long slotId = slot.getSlotId();
-
-            if (slotsWithThesis.contains(slotId)) {
-                throw new AppException(ErrorCode.SLOT_HAS_THESIS_BOOKING, Map.of(
-                        "slotId", slotId,
-                        "slotName", slot.getSlotName()
-                ));
-            }
-
-            if (newBookingType == BookingType.THESIS) {
-                continue;
-            }
-
-            int existingActive = activeCountBySlot.getOrDefault(slotId, 0);
-            if (existingActive + newParticipantCount > labRoom.getCapacity()) {
-                throw new AppException(ErrorCode.BOOKING_EXCEEDS_CAPACITY, Map.of(
-                        "slotId", slotId,
-                        "slotName", slot.getSlotName(),
-                        "capacity", labRoom.getCapacity(),
-                        "existingParticipants", existingActive,
-                        "requestedParticipants", newParticipantCount
-                ));
-            }
         }
     }
 
@@ -467,7 +357,7 @@ public class BookingServiceImpl implements BookingService {
 
         User currentUser = securityUtil.getCurrentUser();
 
-        BookingRequest booking = bookingRequestRepository.findById(bookingRequestId)
+        BookingRequest booking = bookingRequestRepository.lockByBookingRequestId(bookingRequestId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
         if (booking.getStatus() != RequestStatus.PENDING) {
@@ -483,7 +373,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         BookingParticipant participant = bookingParticipantRepository
-                .findByBookingRequestAndUser(booking, currentUser)
+                .lockByBookingRequestAndUser(booking, currentUser)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_A_PARTICIPANT));
 
         if (participant.getStatus() != ParticipantStatus.CONFIRMED) {
@@ -1060,37 +950,6 @@ public class BookingServiceImpl implements BookingService {
         return PageResponse.fromPage(bookingPage, b -> buildSecureBookingResponse(b, securityUtil.getCurrentUser()));
     }
 
-    private void overrideConflictingBookings(LabRoom labRoom, LocalDate date, List<Long> slotIds) {
-        List<BookingRequest> conflicts = slotBookingRepository.findConflictingNonThesisBookings(
-                labRoom.getLabRoomId(), date, slotIds, List.of(RequestStatus.PENDING, RequestStatus.APPROVED));
-
-        if (conflicts.isEmpty())
-            return;
-
-        log.info("Overriding {} student bookings for thesis booking in lab room {}", conflicts.size(),
-                labRoom.getLabRoomId());
-
-        conflicts.forEach(br -> {
-            RequestStatus oldStatus = br.getStatus();
-            br.setStatus(RequestStatus.SYSTEM_CANCELED);
-            String note = "Đã bị hủy bởi hệ thống: Ưu tiên lịch báo cáo đề tài của giảng viên.";
-            br.setResponseNote(note);
-
-            List<BookingParticipant> participants = bookingParticipantRepository.findByBookingRequest(br);
-            participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELLED));
-            bookingParticipantRepository.saveAll(participants);
-
-            List<BookingSlotAttendance> attendances = bookingSlotAttendanceRepository
-                    .findByBookingRequest_BookingRequestId(br.getBookingRequestId());
-            if (!attendances.isEmpty()) {
-                bookingSlotAttendanceRepository.deleteAll(attendances);
-            }
-            saveBookingStatusHistory(br, oldStatus, RequestStatus.SYSTEM_CANCELED, StatusChangeReason.SYSTEM_OVERRIDE_THESIS, note, null);
-        });
-        bookingRequestRepository.saveAll(conflicts);
-    }
-
-
     @Override
     @Transactional(readOnly = true)
     public List<PendingBookingResponse> findRecentPendingBookings(int limit) {
@@ -1160,7 +1019,7 @@ public class BookingServiceImpl implements BookingService {
                                 .leaderName(leader != null ? leader.getFullName() : null)
                                 .leaderUsername(leader != null ? leader.getUsername() : null)
                                 .participantCount(b.getParticipants() != null ? (int) b.getParticipants().stream()
-                                        .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED).count() : 0)
+                                        .filter(p -> BookingConflictQueryService.OCCUPYING_PARTICIPANT_STATUSES.contains(p.getStatus())).count() : 0)
                                 .devices(deviceList)
                                 .responseNote(b.getResponseNote())
                                 .createdAt(b.getCreatedAt())
@@ -1171,14 +1030,17 @@ public class BookingServiceImpl implements BookingService {
             for (BookingRequest b : bookings) {
                 int activeCount = b.getParticipants() != null
                         ? (int) b.getParticipants().stream()
-                        .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED).count()
+                        .filter(p -> BookingConflictQueryService.OCCUPYING_PARTICIPANT_STATUSES.contains(p.getStatus())).count()
                         : 0;
 
                 if (b.getStatus() == RequestStatus.APPROVED) {
                     totalApproved++;
-                    totalOccupants += activeCount;
                 } else if (b.getStatus() == RequestStatus.PENDING) {
                     totalPending++;
+                }
+
+                if (BookingConflictQueryService.ACTIVE_BOOKING_STATUSES.contains(b.getStatus())) {
+                    totalOccupants += activeCount;
                 }
             }
         }

@@ -2,8 +2,10 @@ package iuh.labbooking.service.booking.strategy;
 
 import iuh.labbooking.service.booking.BookingCreationContext;
 import iuh.labbooking.enums.BookingType;
+import iuh.labbooking.enums.ParticipantRole;
 import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.enums.RequestStatus;
+import iuh.labbooking.dto.request.booking.CreateBookingParticipant;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.ResearchGroup;
 import iuh.labbooking.repository.BookingRequestRepository;
@@ -19,7 +21,10 @@ import iuh.labbooking.service.booking.validation.BookingCreationValidator;
 import iuh.labbooking.service.booking.validation.BookingValidationResult;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Component
@@ -57,7 +62,7 @@ public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
 
     @Override
     public BookingRequest create(BookingCreationContext context, BookingValidationResult validationResult) {
-        List<ParticipantSeed> participants = context.participants().stream()
+        List<ParticipantSeed> participants = normalizeParticipants(context).stream()
                 .map(participant -> new ParticipantSeed(participant.userId(), participant.role(), ParticipantStatus.CONFIRMED))
                 .toList();
 
@@ -71,5 +76,16 @@ public class ThesisBookingStrategy extends AbstractBookingCreationStrategy {
                 bookingRequest,
                 context.primaryDate(),
                 slotIds(context));
+    }
+
+    private List<CreateBookingParticipant> normalizeParticipants(BookingCreationContext context) {
+        Map<Long, CreateBookingParticipant> participantsByUserId = new LinkedHashMap<>();
+        participantsByUserId.put(context.requesterId(),
+                new CreateBookingParticipant(context.requesterId(), ParticipantRole.SUPERVISOR));
+
+        context.participants().forEach(participant ->
+                participantsByUserId.put(participant.userId(), participant));
+
+        return new ArrayList<>(participantsByUserId.values());
     }
 }

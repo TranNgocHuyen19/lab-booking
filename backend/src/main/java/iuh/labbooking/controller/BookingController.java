@@ -13,6 +13,8 @@ import iuh.labbooking.dto.response.participant.SecureParticipantResponse;
 import iuh.labbooking.enums.BookingType;
 import iuh.labbooking.enums.RequestStatus;
 import iuh.labbooking.service.booking.BookingService;
+import iuh.labbooking.service.booking.conflict.ResolveScheduleConflictService;
+import iuh.labbooking.util.SecurityUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -30,6 +32,8 @@ import java.util.List;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final ResolveScheduleConflictService resolveScheduleConflictService;
+    private final SecurityUtil securityUtil;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -66,6 +70,19 @@ public class BookingController {
             @PathVariable Long id) {
         BookingResponse response = bookingService.leaveBooking(id);
         return ResponseEntity.ok(ApiResponse.success("Left booking successfully", response));
+    }
+
+    @PostMapping("/participants/{participantId}/resolve-conflict")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Resolve a participant schedule conflict")
+    public ResponseEntity<ApiResponse<Void>> resolveParticipantConflict(
+            @PathVariable Long participantId,
+            @Valid @RequestBody ResolveParticipantConflictRequest request) {
+        resolveScheduleConflictService.resolveParticipantConflict(
+                securityUtil.getCurrentUserId(),
+                participantId,
+                request);
+        return ResponseEntity.ok(ApiResponse.success("Participant conflict resolved successfully", null));
     }
 
     @PostMapping("/{id}/participants")

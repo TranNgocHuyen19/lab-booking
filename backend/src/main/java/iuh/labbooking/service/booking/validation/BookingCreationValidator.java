@@ -62,10 +62,6 @@ public class BookingCreationValidator {
             return result;
         }
 
-        if (context.participants().isEmpty()) {
-            result.addError(ErrorCode.BOOKING_NO_PARTICIPANTS);
-        }
-
         Long researchGroupId = context.researchGroupIds().iterator().next();
         if (conflictQueryService.researchGroupHasActiveGroupBooking(
                 researchGroupId,
@@ -77,7 +73,7 @@ public class BookingCreationValidator {
         addRoomThesisConflict(context, result);
         addGroupParticipantConflicts(context, result);
         addDeviceErrors(context, result);
-        addCapacityErrors(context, result, context.participants().size());
+        addCapacityErrors(context, result, effectiveParticipantCount(context));
         return result;
     }
 
@@ -96,6 +92,9 @@ public class BookingCreationValidator {
         BookingValidationResult result = BookingValidationResult.ok();
         if (context.hasDuplicatedSlots()) {
             result.addError(ErrorCode.DUPLICATED_SLOT_IN_REQUEST);
+        }
+        if (context.hasMultipleDates()) {
+            result.addError(ErrorCode.BOOKING_MULTIPLE_DATES_NOT_ALLOWED);
         }
         addBookingConfigErrors(context, result);
         return result;
@@ -232,15 +231,29 @@ public class BookingCreationValidator {
         var slotIds = context.slotIds();
 
         context.participants().forEach(participant -> {
-            if (conflictQueryService.userHasActivePersonalBooking(participant.userId(), date, slotIds)) {
+            var personalConflicts = conflictQueryService.findActivePersonalBookingsForUser(
+                    participant.userId(),
+                    date,
+                    slotIds);
+            if (!personalConflicts.isEmpty()) {
                 result.addParticipantConflict(new ParticipantConflictResult(
                         participant.userId(),
-                        null,
+                        personalConflicts.getFirst().getBookingRequestId(),
                         BookingType.PERSONAL,
                         ParticipantStatus.PENDING_CONFLICT_RESOLUTION,
                         "Participant has a personal booking and must resolve the conflict before joining."));
             }
         });
+    }
+
+    private int effectiveParticipantCount(BookingCreationContext context) {
+        long requestedParticipants = context.participants().stream()
+                .map(participant -> participant.userId())
+                .distinct()
+                .count();
+        boolean requesterIncluded = context.participants().stream()
+                .anyMatch(participant -> participant.userId().equals(context.requesterId()));
+        return (int) requestedParticipants + (requesterIncluded ? 0 : 1);
     }
 
     private void addRoomThesisConflict(BookingCreationContext context, BookingValidationResult result) {

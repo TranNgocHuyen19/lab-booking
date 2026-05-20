@@ -154,6 +154,7 @@ public enum ErrorCode {
     ROOM_HAS_THESIS_BOOKING(2634, "Room already has an active thesis booking in the same date and slot", HttpStatus.CONFLICT),
     USER_HAS_PENDING_GROUP_INVITATION(2635, "User has a pending group invitation or conflict-resolution booking in the same date and slot", HttpStatus.OK),
     DUPLICATED_SLOT_IN_REQUEST(2636, "Booking request contains duplicated date and slot", HttpStatus.BAD_REQUEST),
+    BOOKING_MULTIPLE_DATES_NOT_ALLOWED(2637, "Booking request can only contain slots in the same date", HttpStatus.BAD_REQUEST),
 
     // ==================== ENTITY: ATTENDANCE (2700-2799) ====================
     ATTENDANCE_NOT_FOUND(2700, "Attendance record not found", HttpStatus.NOT_FOUND),

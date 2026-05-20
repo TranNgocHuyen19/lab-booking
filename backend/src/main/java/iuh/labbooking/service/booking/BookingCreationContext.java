@@ -61,11 +61,19 @@ public record BookingCreationContext(
     public List<Long> slotIds() {
         return slots().stream()
                 .map(CreateBookingSlot::slotId)
+                .distinct()
                 .toList();
     }
 
     public boolean hasDuplicatedSlots() {
         return slots().size() != new java.util.HashSet<>(slotKeys()).size();
+    }
+
+    public boolean hasMultipleDates() {
+        return slots().stream()
+                .map(CreateBookingSlot::bookingDate)
+                .distinct()
+                .count() > 1;
     }
 
     public boolean forceSwitch() {

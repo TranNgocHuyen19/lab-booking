@@ -46,6 +46,17 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         BookingRequest bookingRequest,
                         User user);
 
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("""
+                        SELECT bp
+                        FROM BookingParticipant bp
+                        WHERE bp.bookingRequest = :bookingRequest
+                          AND bp.user = :user
+                        """)
+        Optional<BookingParticipant> lockByBookingRequestAndUser(
+                        @Param("bookingRequest") BookingRequest bookingRequest,
+                        @Param("user") User user);
+
         List<BookingParticipant> findByUserAndStatus(User user, ParticipantStatus status);
 
         long countByBookingRequestAndStatus(
