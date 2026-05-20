@@ -137,6 +137,8 @@ public class BookingServiceImpl implements BookingService {
                     booking.setStatus(RequestStatus.CANCELED);
                     bookingRequestRepository.save(booking);
 
+                    bookingSlotAttendanceRepository.deleteByBookingRequest(booking);
+
                     List<BookingParticipant> participants = bookingParticipantRepository.findByBookingRequest(booking);
                     participants.forEach(p -> p.setStatus(ParticipantStatus.CANCELLED));
                     bookingParticipantRepository.saveAll(participants);
@@ -155,6 +157,8 @@ public class BookingServiceImpl implements BookingService {
                 }
                 participant.setStatus(ParticipantStatus.CANCELLED);
                 bookingParticipantRepository.save(participant);
+
+                bookingSlotAttendanceRepository.deleteByBookingRequestAndBookingParticipant(booking, participant);
             }
         }
     }
@@ -196,6 +200,20 @@ public class BookingServiceImpl implements BookingService {
 
         if (booking.getSlotBookings() == null || booking.getSlotBookings().isEmpty()) {
             throw new AppException(ErrorCode.BOOKING_NOT_FOUND, "Đơn đặt không có thông tin ca học");
+        }
+
+        if (request.participants() != null) {
+            List<String> currentUsernames = booking.getParticipants().stream()
+                    .map(p -> p.getUser().getUsername())
+                    .sorted()
+                    .toList();
+            List<String> requestedUsernames = request.participants().stream()
+                    .map(AddParticipantRequest::username)
+                    .sorted()
+                    .toList();
+            if (!currentUsernames.equals(requestedUsernames)) {
+                throw new AppException(ErrorCode.BOOKING_UPDATE_FIELD_RESTRICTED);
+            }
         }
 
         LabRoom labRoom = labRoomRepository.lockByLabRoomId(booking.getLabRoom().getLabRoomId())
@@ -410,7 +428,7 @@ public class BookingServiceImpl implements BookingService {
                 .findByRequester(currentUser);
 
         List<BookingParticipant> asParticipant = bookingParticipantRepository
-                .findByUserAndStatus(currentUser, ParticipantStatus.CONFIRMED);
+                .findByUserAndStatusIn(currentUser, List.of(ParticipantStatus.CONFIRMED, ParticipantStatus.PENDING_CONFLICT_RESOLUTION));
 
         Set<BookingRequest> allBookings = new HashSet<>(asRequester);
         asParticipant.forEach(p -> allBookings.add(p.getBookingRequest()));
@@ -446,7 +464,7 @@ public class BookingServiceImpl implements BookingService {
 
         boolean isRequester = booking.getRequester().getUserId().equals(currentUser.getUserId());
         boolean isActiveParticipant = bookingParticipantRepository
-                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.CONFIRMED);
+                .existsByBookingRequestAndUserAndStatusIn(booking, currentUser, List.of(ParticipantStatus.CONFIRMED, ParticipantStatus.PENDING_CONFLICT_RESOLUTION));
         boolean isAdmin = currentUser.getRole().getRoleName().equals("ADMIN");
 
         if (!isRequester && !isActiveParticipant && !isAdmin) {
@@ -496,7 +514,7 @@ public class BookingServiceImpl implements BookingService {
 
         User currentUser = securityUtil.getCurrentUser();
         boolean isActiveParticipant = bookingParticipantRepository
-                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.CONFIRMED);
+                .existsByBookingRequestAndUserAndStatusIn(booking, currentUser, List.of(ParticipantStatus.CONFIRMED, ParticipantStatus.PENDING_CONFLICT_RESOLUTION));
         boolean isAdminOrLecturer = securityUtil.isAdmin() || securityUtil.isLecturer();
 
         if (!isActiveParticipant && !isAdminOrLecturer) {
@@ -521,7 +539,7 @@ public class BookingServiceImpl implements BookingService {
 
         boolean isRequester = booking.getRequester().getUserId().equals(currentUser.getUserId());
         boolean isActiveParticipant = bookingParticipantRepository
-                .existsByBookingRequestAndUserAndStatus(booking, currentUser, ParticipantStatus.CONFIRMED);
+                .existsByBookingRequestAndUserAndStatusIn(booking, currentUser, List.of(ParticipantStatus.CONFIRMED, ParticipantStatus.PENDING_CONFLICT_RESOLUTION));
         boolean isAdminOrLecturer = securityUtil.isAdmin() || securityUtil.isLecturer();
 
         if (!isRequester && !isActiveParticipant && !isAdminOrLecturer) {
@@ -604,6 +622,8 @@ public class BookingServiceImpl implements BookingService {
 
         bookingSlotAttendanceRepository.saveAll(attendances);
 
+        // TODO: Publish event BOOKING_APPROVED for notification
+
         log.info("Booking approved: ID={}, Attendance records created: {}",
                 bookingRequestId, attendances.size());
 
@@ -637,6 +657,8 @@ public class BookingServiceImpl implements BookingService {
             booking.setResponseNote(request.responseNote());
         }
         bookingRequestRepository.save(booking);
+
+        // TODO: Publish event BOOKING_REJECTED for notification
 
         log.info("Booking rejected: ID={}, Reason: {}", bookingRequestId, booking.getResponseNote());
 

@@ -59,6 +59,8 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
 
         List<BookingParticipant> findByUserAndStatus(User user, ParticipantStatus status);
 
+        List<BookingParticipant> findByUserAndStatusIn(User user, java.util.Collection<ParticipantStatus> statuses);
+
         long countByBookingRequestAndStatus(
                         BookingRequest bookingRequest,
                         ParticipantStatus status);
@@ -67,6 +69,11 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         BookingRequest bookingRequest,
                         User user,
                         ParticipantStatus status);
+
+        boolean existsByBookingRequestAndUserAndStatusIn(
+                        BookingRequest bookingRequest,
+                        User user,
+                        java.util.Collection<ParticipantStatus> statuses);
 
         List<BookingParticipant> findByBookingRequestAndStatus(
                         BookingRequest bookingRequest,

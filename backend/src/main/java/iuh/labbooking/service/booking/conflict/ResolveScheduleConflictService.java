@@ -75,6 +75,8 @@ public class ResolveScheduleConflictService {
         conflictingPersonalBooking.setStatus(RequestStatus.CANCELED);
         bookingRequestRepository.save(conflictingPersonalBooking);
 
+        bookingSlotAttendanceRepository.deleteByBookingRequest(conflictingPersonalBooking);
+
         List<BookingParticipant> personalParticipants =
                 bookingParticipantRepository.findByBookingRequest(conflictingPersonalBooking);
         personalParticipants.forEach(personalParticipant ->
@@ -93,15 +95,19 @@ public class ResolveScheduleConflictService {
         bookingParticipantRepository.save(participant);
 
         if (groupBooking.getStatus() == RequestStatus.APPROVED) {
-            AttendanceSystemConfig attendanceSnapshot = configService.createAttendanceSnapshot();
-            BookingSlotAttendance attendance = BookingSlotAttendance.builder()
-                    .bookingRequest(groupBooking)
-                    .bookingParticipant(participant)
-                    .attendanceSystemConfig(attendanceSnapshot)
-                    .checkinStatus(CheckinStatus.NOT_CHECKED_IN)
-                    .checkoutStatus(CheckoutStatus.NOT_CHECKED_OUT)
-                    .build();
-            bookingSlotAttendanceRepository.save(attendance);
+            boolean exists = bookingSlotAttendanceRepository
+                    .existsByBookingRequestAndBookingParticipant(groupBooking, participant);
+            if (!exists) {
+                AttendanceSystemConfig attendanceSnapshot = configService.createAttendanceSnapshot();
+                BookingSlotAttendance attendance = BookingSlotAttendance.builder()
+                        .bookingRequest(groupBooking)
+                        .bookingParticipant(participant)
+                        .attendanceSystemConfig(attendanceSnapshot)
+                        .checkinStatus(CheckinStatus.NOT_CHECKED_IN)
+                        .checkoutStatus(CheckoutStatus.NOT_CHECKED_OUT)
+                        .build();
+                bookingSlotAttendanceRepository.save(attendance);
+            }
         }
     }
 }

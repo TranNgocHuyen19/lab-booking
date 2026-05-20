@@ -1,6 +1,8 @@
 package iuh.labbooking.repository;
 
 import iuh.labbooking.model.BookingSlotAttendance;
+import iuh.labbooking.model.BookingRequest;
+import iuh.labbooking.model.BookingParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,9 @@ import java.util.Optional;
 
 @Repository
 public interface BookingSlotAttendanceRepository extends JpaRepository<BookingSlotAttendance, Long> {
+    void deleteByBookingRequest(BookingRequest bookingRequest);
+    void deleteByBookingRequestAndBookingParticipant(BookingRequest bookingRequest, BookingParticipant bookingParticipant);
+    boolean existsByBookingRequestAndBookingParticipant(BookingRequest bookingRequest, BookingParticipant bookingParticipant);
     @Query("""
                         SELECT DISTINCT a FROM BookingSlotAttendance a
                         JOIN FETCH a.bookingRequest br

@@ -22,6 +22,7 @@ public class ThesisOverrideService {
     private final BookingRequestRepository bookingRequestRepository;
     private final BookingParticipantRepository bookingParticipantRepository;
     private final BookingHistoryService bookingHistoryService;
+    private final iuh.labbooking.repository.BookingSlotAttendanceRepository bookingSlotAttendanceRepository;
 
     public void cancelConflictingPersonalAndGroupBookings(BookingRequest thesisBooking, LocalDate date, List<Long> slotIds) {
         List<BookingRequest> conflicts = conflictQueryService.findActivePersonalOrGroupBookingsInRoom(
@@ -51,6 +52,8 @@ public class ThesisOverrideService {
             conflict.setStatus(RequestStatus.CANCELLED_BY_PRIORITY_BOOKING);
             conflict.setResponseNote("Cancelled because a priority thesis booking occupies this room and slot.");
 
+            bookingSlotAttendanceRepository.deleteByBookingRequest(conflict);
+
             var participants = bookingParticipantRepository.findByBookingRequest(conflict);
             participants.forEach(participant -> participant.setStatus(iuh.labbooking.enums.ParticipantStatus.CANCELLED));
             bookingParticipantRepository.saveAll(participants);
@@ -62,6 +65,9 @@ public class ThesisOverrideService {
                     StatusChangeReason.SYSTEM_OVERRIDE_THESIS,
                     conflict.getResponseNote(),
                     thesisBooking.getBookingRequestId());
+
+            // TODO: Publish event BOOKING_CANCELLED_BY_THESIS for notification:
+            // - Recipients: requester of conflict booking, CONFIRMED/PENDING_CONFLICT_RESOLUTION participants of conflict booking
 
             updatedConflicts.add(conflict);
         }

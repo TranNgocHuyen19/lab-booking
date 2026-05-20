@@ -170,6 +170,7 @@ public enum ErrorCode {
     SLOT_ALREADY_ENDED(2707, "Cannot check in after slot has ended", HttpStatus.BAD_REQUEST),
     NOTE_REQUIRED(2708, "Please enter a note (required when late / early checkout)", HttpStatus.BAD_REQUEST),
     ATTENDANCE_ACCESS_DENIED(2710, "You are not allowed to view this attendance data", HttpStatus.FORBIDDEN),
+    BOOKING_UPDATE_FIELD_RESTRICTED(2638, "Updating participants, rooms, slots, booking types or research groups is not allowed", HttpStatus.BAD_REQUEST),
 
     // ==================== ENTITY: SYSTEM CONFIGURATION (2800-2899) ====================
     SYSTEM_CONFIG_NOT_FOUND(2800, "System configuration not found", HttpStatus.NOT_FOUND),
