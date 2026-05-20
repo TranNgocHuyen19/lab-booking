@@ -3,6 +3,7 @@ package iuh.labbooking.mapper.booking;
 import iuh.labbooking.dto.response.booking.BookingParticipantResponse;
 import iuh.labbooking.dto.response.booking.BookingResponse;
 import iuh.labbooking.dto.response.booking.BookingWarning;
+import iuh.labbooking.dto.response.booking.ConflictDeviceResponse;
 import iuh.labbooking.dto.response.booking.ExistingScheduleConflictResponse;
 import iuh.labbooking.dto.response.booking.ParticipantConflictResponse;
 import iuh.labbooking.dto.response.bookingdevice.BookingDeviceResponse;
@@ -106,6 +107,15 @@ public class BookingCreationResponseMapper {
                                 conflict.slotName(),
                                 conflict.startTime(),
                                 conflict.endTime(),
+                                conflict.devices() == null
+                                        ? java.util.List.of()
+                                        : conflict.devices().stream()
+                                        .map(device -> new ConflictDeviceResponse(
+                                                device.deviceId(),
+                                                device.deviceName(),
+                                                device.deviceType(),
+                                                device.quantity()))
+                                        .toList(),
                                 conflict.suggestedAction()))
                         .toList())
                 .build();

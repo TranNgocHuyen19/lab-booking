@@ -17,6 +17,7 @@ import iuh.labbooking.service.booking.availability.DeviceAvailabilityService;
 import iuh.labbooking.service.booking.availability.RoomCapacityService;
 import iuh.labbooking.service.booking.conflict.BookingConflictQueryService;
 import iuh.labbooking.service.booking.validation.BookingValidationResult.BookingValidationError;
+import iuh.labbooking.service.booking.validation.BookingValidationResult.ConflictDeviceResult;
 import iuh.labbooking.service.booking.validation.BookingValidationResult.ExistingScheduleConflictResult;
 import iuh.labbooking.service.booking.validation.BookingValidationResult.ParticipantConflictResult;
 import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
@@ -277,6 +278,25 @@ public class BookingCreationValidator {
         LocalTime startTime = slotBooking != null ? slotBooking.getStartTime() : null;
         LocalTime endTime = slotBooking != null ? slotBooking.getEndTime() : null;
 
+        List<ConflictDeviceResult> devices = conflictingBooking.getBookingDevices() == null
+            ? List.of()
+            : conflictingBooking.getBookingDevices().stream()
+            .filter(item -> item.getDevice() != null && item.getQuantity() != null && item.getQuantity() > 0)
+            .sorted((a, b) -> {
+                Long aId = a.getDevice() != null ? a.getDevice().getDeviceId() : null;
+                Long bId = b.getDevice() != null ? b.getDevice().getDeviceId() : null;
+                if (aId == null && bId == null) return 0;
+                if (aId == null) return 1;
+                if (bId == null) return -1;
+                return aId.compareTo(bId);
+            })
+            .map(item -> new ConflictDeviceResult(
+                item.getDevice().getDeviceId(),
+                item.getDevice().getDeviceName(),
+                item.getDevice().getDeviceType(),
+                item.getQuantity()))
+            .toList();
+
         return new ExistingScheduleConflictResult(
                 code,
                 message,
@@ -291,6 +311,7 @@ public class BookingCreationValidator {
                 slot != null ? slot.getSlotName() : null,
                 startTime,
                 endTime,
+            devices,
                 action);
     }
 

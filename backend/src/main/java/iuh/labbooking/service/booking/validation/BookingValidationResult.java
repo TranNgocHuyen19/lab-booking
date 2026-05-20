@@ -128,9 +128,18 @@ public record BookingValidationResult(
             String slotName,
             LocalTime startTime,
             LocalTime endTime,
+            List<ConflictDeviceResult> devices,
             ScheduleConflictAction suggestedAction
     ) {
     }
+
+        public record ConflictDeviceResult(
+            Long deviceId,
+            String deviceName,
+            String deviceType,
+            Integer quantity
+        ) {
+        }
 
     public record DeviceAvailabilityResult(
             Long deviceId,

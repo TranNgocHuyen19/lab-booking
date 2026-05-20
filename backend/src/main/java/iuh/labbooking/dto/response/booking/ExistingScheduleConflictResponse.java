@@ -5,6 +5,7 @@ import iuh.labbooking.enums.ScheduleConflictAction;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 public record ExistingScheduleConflictResponse(
         String code,
@@ -20,6 +21,7 @@ public record ExistingScheduleConflictResponse(
         String slotName,
         LocalTime startTime,
         LocalTime endTime,
+        List<ConflictDeviceResponse> devices,
         ScheduleConflictAction suggestedAction
 ) {
 }
