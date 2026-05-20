@@ -30,7 +30,7 @@ import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { MemberInfoResponse, SecureResearchGroupResponse } from '@/schemas/research-group.schema'
 import type { SlotResponse } from '@/schemas/slot.schema'
 import type { UserResponse } from '@/schemas/user.schema'
-import { handleBookingCreateError, showBookingCreateFeedback } from '@/utils/booking-create-feedback'
+import { handleBookingCreateError, showBookingCreateFeedback, getScheduleConflictDetails } from '@/utils/booking-create-feedback'
 import type { BookingCreateWarningDialog } from '@/utils/booking-create-feedback'
 
 interface LecturerBookingFormProps {
@@ -106,7 +106,7 @@ export const LecturerBookingForm = ({
     }))
   }
 
-  const handleSaveBooking = async () => {
+  const handleSaveBooking = async (forceSwitch?: boolean) => {
     if (!purpose.trim()) {
       toast.error('Vui lòng nhập mục đích sử dụng')
       return
@@ -151,7 +151,8 @@ export const LecturerBookingForm = ({
         purpose,
         participants: [...groupParticipants, ...auditingList],
         researchGroupIds: selectedGroups.map(Number),
-        devices
+        devices,
+        forceSwitch
       }
 
       const response = await createBookingMutation.mutateAsync(payload)
@@ -162,7 +163,15 @@ export const LecturerBookingForm = ({
       }
       finishBookingCreation()
     } catch (error: unknown) {
-      handleBookingCreateError(error)
+      const conflictDialog = getScheduleConflictDetails(error);
+      if (conflictDialog) {
+        setWarningDialog({
+          ...conflictDialog,
+          onConfirm: () => handleSaveBooking(true)
+        });
+        return;
+      }
+      handleBookingCreateError(error);
     }
   }
 
@@ -506,14 +515,22 @@ export const LecturerBookingForm = ({
         <DuplicateConfirmDialog
           open={!!warningDialog}
           onOpenChange={(open) => {
-            if (!open) finishBookingCreation()
+            if (!open) {
+              if (warningDialog.showCancel) {
+                setWarningDialog(null)
+              } else {
+                finishBookingCreation()
+              }
+            }
           }}
+          onConfirm={warningDialog.onConfirm}
           conflictDetails={warningDialog.conflictDetails}
           title={warningDialog.title}
           description={warningDialog.description}
           note={warningDialog.note}
           confirmLabel={warningDialog.confirmLabel}
-          showCancel={false}
+          cancelLabel={warningDialog.cancelLabel}
+          showCancel={warningDialog.showCancel ?? false}
         />
       )}
     </>

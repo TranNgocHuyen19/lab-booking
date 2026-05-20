@@ -35,12 +35,13 @@ export const DeviceQuantityRequestSchema = z.object({
 
 export const CreateBookingRequestSchema = z.object({
   labRoomId: z.number(),
-  slots: z.array(CreateBookingSlotSchema).min(1, 'Ch?n �t nh?t 1 ca'),
+  slots: z.array(CreateBookingSlotSchema).min(1, 'Ch?n �t nh?t 1 ca'),
   bookingType: BookingTypeSchema,
   purpose: z.string().min(1, 'Vui lòng nhập mục đích').max(500),
   participants: z.array(CreateBookingParticipantSchema).optional(),
   researchGroupIds: z.array(z.number()).optional(),
   devices: z.array(DeviceQuantityRequestSchema).optional(),
+  forceSwitch: z.boolean().optional(),
 })
 
 export type CreateBookingRequest = z.infer<typeof CreateBookingRequestSchema>
@@ -70,6 +71,23 @@ export const ParticipantConflictResponseSchema = z.object({
   conflictingBookingType: BookingTypeSchema.nullable().optional(),
   suggestedParticipantStatus: z.string().nullable().optional(),
   message: z.string()
+})
+
+export const ExistingScheduleConflictResponseSchema = z.object({
+  code: z.string().optional(),
+  message: z.string().optional(),
+  userId: z.number().nullable().optional(),
+  conflictingBookingRequestId: z.number().nullable().optional(),
+  conflictingBookingType: BookingTypeSchema.nullable().optional(),
+  bookingDate: z.string().nullable().optional(),
+  slotId: z.number().nullable().optional(),
+  labRoomId: z.number().nullable().optional(),
+  roomName: z.string().nullable().optional(),
+  building: z.string().nullable().optional(),
+  slotName: z.string().nullable().optional(),
+  startTime: z.string().nullable().optional(),
+  endTime: z.string().nullable().optional(),
+  suggestedAction: z.string().nullable().optional()
 })
 
 export const BookingDeviceResponseSchema = z.object({
@@ -115,7 +133,8 @@ export const BookingResponseSchema = z.object({
   createdAt: z.string(),
   participants: z.array(BookingParticipantResponseSchema).optional(),
   warnings: z.array(BookingWarningSchema).optional(),
-  participantConflicts: z.array(ParticipantConflictResponseSchema).optional()
+  participantConflicts: z.array(ParticipantConflictResponseSchema).optional(),
+  existingScheduleConflicts: z.array(ExistingScheduleConflictResponseSchema).optional()
 })
 
 export type BookingResponse = z.infer<typeof BookingResponseSchema>

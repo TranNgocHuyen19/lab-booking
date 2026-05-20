@@ -31,10 +31,28 @@ type BookingSlotItem = {
   endTime?: string | null
 }
 
+type ExistingScheduleConflictItem = {
+  code?: string
+  message?: string
+  userId?: number | null
+  conflictingBookingRequestId?: number | null
+  conflictingBookingType?: string | null
+  bookingDate?: string | null
+  slotId?: number | null
+  labRoomId?: number | null
+  roomName?: string | null
+  building?: string | null
+  slotName?: string | null
+  startTime?: string | null
+  endTime?: string | null
+  suggestedAction?: string | null
+}
+
 type BookingValidationPayload = {
   errors?: BookingFeedbackItem[]
   warnings?: BookingFeedbackItem[]
   participantConflicts?: ParticipantConflictItem[]
+  existingScheduleConflicts?: ExistingScheduleConflictItem[]
 }
 
 type BookingCreatePayload = BookingValidationPayload & {
@@ -51,6 +69,9 @@ export type BookingCreateWarningDialog = {
   note: string
   confirmLabel: string
   conflictDetails: DuplicateConflictDetail[]
+  showCancel?: boolean
+  cancelLabel?: string
+  onConfirm?: () => void
 }
 
 const pickBookingData = (response: unknown): BookingCreatePayload | undefined => {
@@ -113,6 +134,20 @@ const buildSlotText = (data?: BookingCreatePayload) => {
   return date ? `${date}: ${slotText}` : slotText
 }
 
+const buildExistingScheduleConflictTime = (conflict: ExistingScheduleConflictItem) => {
+  const room = conflict.roomName || (conflict.labRoomId ? `Phòng #${conflict.labRoomId}` : '')
+  const date = formatDate(conflict.bookingDate)
+  const slot = conflict.slotName || (conflict.slotId ? `Ca #${conflict.slotId}` : '')
+  const timeRange =
+    conflict.startTime || conflict.endTime
+      ? ` (${formatTime(conflict.startTime)} - ${formatTime(conflict.endTime)})`
+      : ''
+
+  return [room, date, `${slot}${timeRange}`]
+    .filter((item) => item && item.trim().length > 0)
+    .join(' - ')
+}
+
 export const buildBookingCreateWarningDialog = (response: unknown): BookingCreateWarningDialog | null => {
   const data = pickBookingData(response)
   const warnings = data?.warnings || []
@@ -133,7 +168,6 @@ export const buildBookingCreateWarningDialog = (response: unknown): BookingCreat
         : conflict.conflictingBookingType === 'GROUP'
           ? 'Bị trùng với booking nhóm đã có.'
           : conflict.message || 'Bị trùng với booking khác.'
-
     return {
       title: displayName,
       subtitle: username ? `${username}. ${source}` : source,
@@ -207,3 +241,55 @@ export const handleBookingCreateError = (error: unknown) => {
 
   handleErrorApi({ error })
 }
+
+export const getScheduleConflictDetails = (error: unknown): BookingCreateWarningDialog | null => {
+  if (!axios.isAxiosError(error)) return null;
+
+  const errorBody = error.response?.data as {
+    code?: number
+    message?: string
+    data?: BookingValidationPayload
+  } | undefined;
+  const validationData = errorBody?.data;
+  const existingScheduleConflicts = validationData?.existingScheduleConflicts || [];
+
+  if (existingScheduleConflicts.length === 0) return null;
+
+  const conflictDetails: DuplicateConflictDetail[] = existingScheduleConflicts.map((conflict: ExistingScheduleConflictItem) => {
+    const source =
+      conflict.conflictingBookingType === 'PERSONAL'
+        ? 'Bạn đang có booking cá nhân vào thời gian này.'
+        : conflict.conflictingBookingType === 'GROUP'
+          ? 'Bạn đang có booking nhóm vào thời gian này.'
+          : conflict.message || 'Lịch đã bị trùng.';
+
+    const conflictTime = buildExistingScheduleConflictTime(conflict) || buildSlotText(validationData as BookingCreatePayload);
+    const _titlePrefix =
+      conflict.conflictingBookingType === 'PERSONAL'
+        ? 'Lịch cá nhân đang trùng'
+        : conflict.conflictingBookingType === 'GROUP'
+          ? 'Lịch nhóm đang trùng'
+          : 'Lịch đang trùng';
+
+    return {
+      title: 'Lịch đặt hiện tại bị trùng',
+      subtitle: conflict.building ? `${_titlePrefix}. ${source} Khu ${conflict.building}.` : `${_titlePrefix}. ${source}`,
+      time: conflictTime,
+      status: 'Trùng lịch',
+      instruction:
+        conflict.conflictingBookingType === 'PERSONAL'
+          ? 'Nếu đồng ý chuyển lịch, hệ thống sẽ tự động HỦY lịch cũ này để đăng ký lịch mới.'
+          : 'Nếu đồng ý chuyển lịch, hệ thống sẽ tự động rút bạn ra khỏi nhóm của lịch cũ này để đăng ký lịch mới.'
+    };
+  });
+
+  return {
+    title: 'Xác nhận chuyển lịch đặt phòng',
+    description: 'Hệ thống phát hiện bạn đang có lịch đặt phòng khác trùng với thời gian này:',
+    note: 'Lưu ý: Xác nhận \'Chuyển lịch\' sẽ hủy/rút khỏi lịch cũ để đặt lịch mới. Chọn \'Giữ lịch cũ\' để giữ nguyên lịch cũ và hủy yêu cầu này.',
+    confirmLabel: 'Chuyển lịch',
+    showCancel: true,
+    cancelLabel: 'Giữ lịch cũ',
+    conflictDetails
+  };
+};
