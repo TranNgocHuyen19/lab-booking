@@ -7,6 +7,7 @@ import iuh.labbooking.enums.ScheduleConflictAction;
 import iuh.labbooking.exception.ErrorCode;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -121,6 +122,12 @@ public record BookingValidationResult(
             BookingType conflictingBookingType,
             LocalDate bookingDate,
             Long slotId,
+            Long labRoomId,
+            String roomName,
+            String building,
+            String slotName,
+            LocalTime startTime,
+            LocalTime endTime,
             ScheduleConflictAction suggestedAction
     ) {
     }

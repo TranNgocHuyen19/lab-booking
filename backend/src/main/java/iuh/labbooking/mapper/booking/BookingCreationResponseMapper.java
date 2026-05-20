@@ -100,6 +100,12 @@ public class BookingCreationResponseMapper {
                                 conflict.conflictingBookingType(),
                                 conflict.bookingDate(),
                                 conflict.slotId(),
+                                conflict.labRoomId(),
+                                conflict.roomName(),
+                                conflict.building(),
+                                conflict.slotName(),
+                                conflict.startTime(),
+                                conflict.endTime(),
                                 conflict.suggestedAction()))
                         .toList())
                 .build();

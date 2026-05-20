@@ -5,7 +5,9 @@ import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.enums.ScheduleConflictAction;
 import iuh.labbooking.exception.ErrorCode;
 import iuh.labbooking.model.BookingSystemConfig;
+import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.Slot;
+import iuh.labbooking.model.SlotBooking;
 import iuh.labbooking.model.User;
 import iuh.labbooking.repository.BookingRequestRepository;
 import iuh.labbooking.repository.SlotRepository;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Component
@@ -187,16 +190,17 @@ public class BookingCreationValidator {
                 BookingType.PERSONAL,
                 activeStatuses);
         if (!personalConflicts.isEmpty()) {
-            Long conflictingId = personalConflicts.getFirst().getBookingRequestId();
-            slotIds.forEach(slotId -> result.addExistingScheduleConflict(new ExistingScheduleConflictResult(
+            BookingRequest conflict = personalConflicts.getFirst();
+            addExistingScheduleConflictsForBooking(
+                    result,
                     ErrorCode.PERSONAL_BOOKING_DUPLICATED.name(),
                     ErrorCode.PERSONAL_BOOKING_DUPLICATED.getMessage(),
                     context.requesterId(),
-                    conflictingId,
+                    conflict,
                     BookingType.PERSONAL,
                     date,
-                    slotId,
-                    ScheduleConflictAction.SWITCH_TO_NEW_BOOKING)));
+                    slotIds,
+                    ScheduleConflictAction.SWITCH_TO_NEW_BOOKING);
             result.addWarning(ErrorCode.PERSONAL_BOOKING_DUPLICATED);
         }
 
@@ -207,21 +211,87 @@ public class BookingCreationValidator {
                 ParticipantStatus.CONFIRMED,
                 activeStatuses);
         if (!confirmedGroupConflicts.isEmpty()) {
-            Long conflictingId = confirmedGroupConflicts.getFirst().getBookingRequestId();
-            slotIds.forEach(slotId -> result.addExistingScheduleConflict(new ExistingScheduleConflictResult(
+            BookingRequest conflict = confirmedGroupConflicts.getFirst();
+            addExistingScheduleConflictsForBooking(
+                    result,
                     ErrorCode.USER_CONFIRMED_IN_GROUP_BOOKING.name(),
                     ErrorCode.USER_CONFIRMED_IN_GROUP_BOOKING.getMessage(),
                     context.requesterId(),
-                    conflictingId,
+                    conflict,
                     BookingType.GROUP,
                     date,
-                    slotId,
-                    ScheduleConflictAction.KEEP_EXISTING_BOOKING)));
+                    slotIds,
+                    ScheduleConflictAction.KEEP_EXISTING_BOOKING);
             result.addWarning(ErrorCode.USER_CONFIRMED_IN_GROUP_BOOKING);
         }
 
         conflictQueryService.findSoftGroupConflicts(context.requesterId(), date, slotIds)
                 .forEach(conflict -> result.addWarning(ErrorCode.USER_HAS_PENDING_GROUP_INVITATION));
+    }
+
+    private void addExistingScheduleConflictsForBooking(
+            BookingValidationResult result,
+            String code,
+            String message,
+            Long userId,
+            BookingRequest conflictingBooking,
+            BookingType conflictingBookingType,
+            LocalDate bookingDate,
+            List<Long> slotIds,
+            ScheduleConflictAction action) {
+        var conflictingSlotIds = conflictingBooking.getSlotBookings().stream()
+                .filter(item -> item.getBookingDate().equals(bookingDate)
+                        && slotIds.contains(item.getSlot().getSlotId()))
+                .map(item -> item.getSlot().getSlotId())
+                .distinct()
+                .toList();
+
+        var exactSlotIds = conflictingSlotIds.isEmpty() ? slotIds : conflictingSlotIds;
+        exactSlotIds.forEach(slotId -> result.addExistingScheduleConflict(existingScheduleConflict(
+                code,
+                message,
+                userId,
+                conflictingBooking,
+                conflictingBookingType,
+                bookingDate,
+                slotId,
+                action)));
+    }
+
+    private ExistingScheduleConflictResult existingScheduleConflict(
+            String code,
+            String message,
+            Long userId,
+            BookingRequest conflictingBooking,
+            BookingType conflictingBookingType,
+            LocalDate bookingDate,
+            Long slotId,
+            ScheduleConflictAction action) {
+        SlotBooking slotBooking = conflictingBooking.getSlotBookings().stream()
+                .filter(item -> item.getBookingDate().equals(bookingDate)
+                        && item.getSlot().getSlotId().equals(slotId))
+                .findFirst()
+                .orElse(null);
+
+        Slot slot = slotBooking != null ? slotBooking.getSlot() : null;
+        LocalTime startTime = slotBooking != null ? slotBooking.getStartTime() : null;
+        LocalTime endTime = slotBooking != null ? slotBooking.getEndTime() : null;
+
+        return new ExistingScheduleConflictResult(
+                code,
+                message,
+                userId,
+                conflictingBooking.getBookingRequestId(),
+                conflictingBookingType,
+                bookingDate,
+                slotId,
+                conflictingBooking.getLabRoom() != null ? conflictingBooking.getLabRoom().getLabRoomId() : null,
+                conflictingBooking.getLabRoom() != null ? conflictingBooking.getLabRoom().getRoomName() : null,
+                conflictingBooking.getLabRoom() != null ? conflictingBooking.getLabRoom().getBuilding() : null,
+                slot != null ? slot.getSlotName() : null,
+                startTime,
+                endTime,
+                action);
     }
 
     private void addGroupParticipantConflicts(

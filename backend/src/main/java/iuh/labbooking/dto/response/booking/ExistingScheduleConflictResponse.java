@@ -4,6 +4,7 @@ import iuh.labbooking.enums.BookingType;
 import iuh.labbooking.enums.ScheduleConflictAction;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 public record ExistingScheduleConflictResponse(
         String code,
@@ -13,6 +14,12 @@ public record ExistingScheduleConflictResponse(
         BookingType conflictingBookingType,
         LocalDate bookingDate,
         Long slotId,
+        Long labRoomId,
+        String roomName,
+        String building,
+        String slotName,
+        LocalTime startTime,
+        LocalTime endTime,
         ScheduleConflictAction suggestedAction
 ) {
 }
