@@ -87,6 +87,18 @@ public class BookingCreationValidator {
             return result;
         }
 
+        User requester = userRepository.findById(context.requesterId()).orElse(null);
+        if (requester == null || requester.getRole() == null) {
+            result.addError(ErrorCode.USER_NOT_FOUND);
+            return result;
+        }
+
+        String roleName = requester.getRole().getRoleName();
+        if (!"ADMIN".equals(roleName) && !"LECTURER".equals(roleName)) {
+            result.addError(ErrorCode.THESIS_BOOKING_NOT_ALLOWED);
+            return result;
+        }
+
         addRoomThesisConflict(context, result);
         addDeviceErrors(context, result);
         return result;
