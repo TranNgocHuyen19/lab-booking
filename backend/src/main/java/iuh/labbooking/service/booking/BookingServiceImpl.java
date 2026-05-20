@@ -378,12 +378,17 @@ public class BookingServiceImpl implements BookingService {
                 .lockByBookingRequestAndUser(booking, currentUser)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_A_PARTICIPANT));
 
-        if (participant.getStatus() != ParticipantStatus.CONFIRMED) {
+        if (participant.getStatus() != ParticipantStatus.CONFIRMED
+                && participant.getStatus() != ParticipantStatus.INVITED
+                && participant.getStatus() != ParticipantStatus.PENDING_CONFLICT_RESOLUTION) {
             throw new AppException(ErrorCode.NOT_A_PARTICIPANT);
         }
 
-        long activeCount = bookingParticipantRepository
-                .countByBookingRequestAndStatus(booking, ParticipantStatus.CONFIRMED);
+        long activeCount = booking.getParticipants().stream()
+                .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED 
+                        || p.getStatus() == ParticipantStatus.INVITED 
+                        || p.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION)
+                .count();
 
         if (activeCount <= 1) {
             throw new AppException(ErrorCode.CANNOT_REMOVE_LAST_PARTICIPANT);
@@ -582,6 +587,15 @@ public class BookingServiceImpl implements BookingService {
         if (request != null && request.responseNote() != null) {
             booking.setResponseNote(request.responseNote());
         }
+
+        for (BookingParticipant participant : booking.getParticipants()) {
+            if (participant.getStatus() == ParticipantStatus.INVITED 
+                    || participant.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION) {
+                participant.setStatus(ParticipantStatus.CONFIRMED);
+            }
+        }
+        bookingParticipantRepository.saveAll(booking.getParticipants());
+
         bookingRequestRepository.save(booking);
 
         AttendanceSystemConfig attendanceSnapshot = configService.createAttendanceSnapshot();
