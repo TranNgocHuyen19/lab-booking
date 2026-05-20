@@ -67,4 +67,24 @@ public interface BookingDeviceRepository extends JpaRepository<BookingDevice, Bo
         @Param("bookingDate") LocalDate bookingDate,
         @Param("slotId") Long slotId,
         @Param("activeStatuses") List<iuh.labbooking.enums.RequestStatus> activeStatuses);
+
+  @Query("""
+          SELECT COALESCE(SUM(bd.quantity), 0)
+          FROM BookingDevice bd
+          JOIN bd.bookingRequest br
+          JOIN br.slotBookings sb
+          WHERE br.labRoom.labRoomId = :labRoomId
+            AND bd.device.deviceId = :deviceId
+            AND sb.bookingDate = :bookingDate
+            AND sb.slot.slotId = :slotId
+            AND br.status IN :activeStatuses
+            AND br.bookingRequestId <> :excludeId
+      """)
+  long countReservedQuantityExcludingBooking(
+        @Param("labRoomId") Long labRoomId,
+        @Param("deviceId") Long deviceId,
+        @Param("bookingDate") LocalDate bookingDate,
+        @Param("slotId") Long slotId,
+        @Param("activeStatuses") List<iuh.labbooking.enums.RequestStatus> activeStatuses,
+        @Param("excludeId") Long excludeId);
 }

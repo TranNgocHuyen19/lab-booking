@@ -96,4 +96,14 @@ public class BookingConflictQueryService {
                 ACTIVE_BOOKING_STATUSES,
                 OCCUPYING_PARTICIPANT_STATUSES);
     }
+
+    public long countOccupiedSeatsExcludingBooking(Long labRoomId, LocalDate date, Long slotId, Long excludeId) {
+        return bookingParticipantRepository.countOccupiedSeatsExcludingBooking(
+                labRoomId,
+                date,
+                slotId,
+                ACTIVE_BOOKING_STATUSES,
+                OCCUPYING_PARTICIPANT_STATUSES,
+                excludeId);
+    }
 }

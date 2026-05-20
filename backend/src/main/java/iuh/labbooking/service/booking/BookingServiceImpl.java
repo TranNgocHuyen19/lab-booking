@@ -77,6 +77,7 @@ public class BookingServiceImpl implements BookingService {
     private final UserMapper userMapper;
     private final BookingStrategyFactory bookingStrategyFactory;
     private final BookingCreationResponseMapper bookingCreationResponseMapper;
+    private final BookingConflictQueryService bookingConflictQueryService;
 
 
     @Transactional
@@ -560,13 +561,7 @@ public class BookingServiceImpl implements BookingService {
 
         validateApprovalAuthority(booking, approver);
 
-        BookingCreationContext context = buildCreationContextFromBookingRequest(booking);
-        BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(booking.getBookingType());
-        BookingValidationResult validationResult = strategy.validate(context);
-
-        if (validationResult.hasErrors() || !validationResult.existingScheduleConflicts().isEmpty()) {
-            throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
-        }
+        validateResourcesForApproval(booking);
 
         BookingSystemConfig currentConfig = configService.getActiveBookingConfig();
         LocalDateTime startTime = getBookingStartTime(booking);
@@ -591,8 +586,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         for (BookingParticipant participant : booking.getParticipants()) {
-            if (participant.getStatus() == ParticipantStatus.INVITED 
-                    || participant.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION) {
+            if (participant.getStatus() == ParticipantStatus.INVITED) {
                 participant.setStatus(ParticipantStatus.CONFIRMED);
             }
         }
@@ -1233,6 +1227,88 @@ public class BookingServiceImpl implements BookingService {
                 }
             } else {
                 throw new AppException(ErrorCode.UNAUTHORIZED);
+            }
+        }
+    }
+
+    private void validateResourcesForApproval(BookingRequest booking) {
+        Long excludeId = booking.getBookingRequestId();
+        Long labRoomId = booking.getLabRoom().getLabRoomId();
+        java.util.Set<SlotBooking> slotBookings = booking.getSlotBookings();
+        List<RequestStatus> activeStatuses = BookingConflictQueryService.ACTIVE_BOOKING_STATUSES;
+
+        // 1. Room capacity check excluding this booking's participants
+        long requestedSeats = booking.getParticipants().stream()
+                .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED 
+                        || p.getStatus() == ParticipantStatus.INVITED 
+                        || p.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION)
+                .count();
+
+        int capacity = booking.getLabRoom().getCapacity();
+        for (SlotBooking sb : slotBookings) {
+            long occupied = bookingParticipantRepository.countOccupiedSeatsExcludingBooking(
+                    labRoomId,
+                    sb.getBookingDate(),
+                    sb.getSlot().getSlotId(),
+                    activeStatuses,
+                    BookingConflictQueryService.OCCUPYING_PARTICIPANT_STATUSES,
+                    excludeId
+            );
+            if (occupied + requestedSeats > capacity) {
+                throw new AppException(ErrorCode.BOOKING_EXCEEDS_CAPACITY, Map.of(
+                        "slotName", sb.getSlot().getSlotName(),
+                        "bookingDate", sb.getBookingDate().toString(),
+                        "occupied", occupied,
+                        "requested", requestedSeats,
+                        "capacity", capacity
+                ));
+            }
+        }
+
+        // 2. Device availability check excluding this booking's devices
+        for (BookingDevice bd : booking.getBookingDevices()) {
+            Long deviceId = bd.getDevice().getDeviceId();
+            int totalInRoom = labRoomDeviceRepository
+                    .findByLabRoom_LabRoomIdAndDevice_DeviceId(labRoomId, deviceId)
+                    .map(LabRoomDevice::getQuantity)
+                    .orElse(0);
+
+            for (SlotBooking sb : slotBookings) {
+                long reserved = bookingDeviceRepository.countReservedQuantityExcludingBooking(
+                        labRoomId,
+                        deviceId,
+                        sb.getBookingDate(),
+                        sb.getSlot().getSlotId(),
+                        activeStatuses,
+                        excludeId
+                );
+                long available = totalInRoom - reserved;
+                if (available < bd.getQuantity()) {
+                    throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, Map.of(
+                            "deviceName", bd.getDevice().getDeviceName(),
+                            "slotName", sb.getSlot().getSlotName(),
+                            "bookingDate", sb.getBookingDate().toString(),
+                            "available", available,
+                            "requested", bd.getQuantity()
+                    ));
+                }
+            }
+        }
+
+        // 3. Thesis conflict check excluding this booking
+        if (!slotBookings.isEmpty()) {
+            LocalDate date = slotBookings.iterator().next().getBookingDate();
+            List<Long> slotIds = slotBookings.stream().map(sb -> sb.getSlot().getSlotId()).toList();
+            
+            List<BookingRequest> activeThesis = bookingRequestRepository.findActiveThesisByRoomDateSlotExcludingBooking(
+                    labRoomId,
+                    date,
+                    slotIds,
+                    activeStatuses,
+                    excludeId
+            );
+            if (!activeThesis.isEmpty()) {
+                throw new AppException(ErrorCode.ROOM_HAS_THESIS_BOOKING);
             }
         }
     }

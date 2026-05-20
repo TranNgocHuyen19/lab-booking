@@ -12,7 +12,13 @@ import iuh.labbooking.model.BookingParticipant;
 import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.repository.BookingParticipantRepository;
 import iuh.labbooking.repository.BookingRequestRepository;
+import iuh.labbooking.repository.BookingSlotAttendanceRepository;
 import iuh.labbooking.service.booking.BookingHistoryService;
+import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
+import iuh.labbooking.model.BookingSlotAttendance;
+import iuh.labbooking.model.AttendanceSystemConfig;
+import iuh.labbooking.enums.CheckinStatus;
+import iuh.labbooking.enums.CheckoutStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +32,8 @@ public class ResolveScheduleConflictService {
     private final BookingRequestRepository bookingRequestRepository;
     private final BookingParticipantRepository bookingParticipantRepository;
     private final BookingHistoryService bookingHistoryService;
+    private final BookingSlotAttendanceRepository bookingSlotAttendanceRepository;
+    private final SystemConfigurationService configService;
 
     @Transactional
     public void resolveParticipantConflict(Long currentUserId, Long participantId, ResolveParticipantConflictRequest request) {
@@ -83,5 +91,17 @@ public class ResolveScheduleConflictService {
 
         participant.setStatus(ParticipantStatus.CONFIRMED);
         bookingParticipantRepository.save(participant);
+
+        if (groupBooking.getStatus() == RequestStatus.APPROVED) {
+            AttendanceSystemConfig attendanceSnapshot = configService.createAttendanceSnapshot();
+            BookingSlotAttendance attendance = BookingSlotAttendance.builder()
+                    .bookingRequest(groupBooking)
+                    .bookingParticipant(participant)
+                    .attendanceSystemConfig(attendanceSnapshot)
+                    .checkinStatus(CheckinStatus.NOT_CHECKED_IN)
+                    .checkoutStatus(CheckoutStatus.NOT_CHECKED_OUT)
+                    .build();
+            bookingSlotAttendanceRepository.save(attendance);
+        }
     }
 }

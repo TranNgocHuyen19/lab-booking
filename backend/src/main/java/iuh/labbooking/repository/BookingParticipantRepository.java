@@ -237,4 +237,25 @@ public interface BookingParticipantRepository extends JpaRepository<BookingParti
                         @Param("slotId") Long slotId,
                         @Param("activeStatuses") List<RequestStatus> activeStatuses,
                         @Param("participantStatuses") List<ParticipantStatus> participantStatuses);
+
+        @Query("""
+                        SELECT COUNT(bp)
+                        FROM BookingParticipant bp
+                        JOIN bp.bookingRequest br
+                        JOIN br.slotBookings sb
+                        WHERE br.labRoom.labRoomId = :labRoomId
+                          AND br.bookingType <> 'THESIS'
+                          AND br.status IN :activeStatuses
+                          AND bp.status IN :participantStatuses
+                          AND sb.bookingDate = :bookingDate
+                          AND sb.slot.slotId = :slotId
+                          AND br.bookingRequestId <> :excludeId
+                        """)
+        long countOccupiedSeatsExcludingBooking(
+                        @Param("labRoomId") Long labRoomId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotId") Long slotId,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("participantStatuses") List<ParticipantStatus> participantStatuses,
+                        @Param("excludeId") Long excludeId);
 }

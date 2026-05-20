@@ -206,6 +206,24 @@ public interface BookingRequestRepository
         @Query("""
                 SELECT DISTINCT br
                 FROM BookingRequest br
+                JOIN br.slotBookings sb
+                WHERE br.labRoom.labRoomId = :labRoomId
+                  AND br.bookingType = 'THESIS'
+                  AND br.status IN :activeStatuses
+                  AND sb.bookingDate = :bookingDate
+                  AND sb.slot.slotId IN :slotIds
+                  AND br.bookingRequestId <> :excludeId
+                """)
+        List<BookingRequest> findActiveThesisByRoomDateSlotExcludingBooking(
+                        @Param("labRoomId") Long labRoomId,
+                        @Param("bookingDate") LocalDate bookingDate,
+                        @Param("slotIds") List<Long> slotIds,
+                        @Param("activeStatuses") List<RequestStatus> activeStatuses,
+                        @Param("excludeId") Long excludeId);
+
+        @Query("""
+                SELECT DISTINCT br
+                FROM BookingRequest br
                 JOIN br.participants bp
                 JOIN br.slotBookings sb
                 WHERE bp.user.userId = :userId
