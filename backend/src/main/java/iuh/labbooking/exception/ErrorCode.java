@@ -128,7 +128,7 @@ public enum ErrorCode {
     PARTICIPANT_CANNOT_LEAVE_THESIS(2611, "Participants cannot leave THESIS booking", HttpStatus.FORBIDDEN),
     NOT_A_PARTICIPANT(2612, "User is not a participant of this booking", HttpStatus.FORBIDDEN),
     THESIS_BOOKING_NOT_ALLOWED(2613, "Only ADMIN or LECTURER can create THESIS booking", HttpStatus.FORBIDDEN),
-    MAX_PENDING_BOOKINGS_EXCEEDED(2622, "You have exceeded the maximum allowed pending bookings", HttpStatus.BAD_REQUEST),
+    MAX_PENDING_BOOKINGS_EXCEEDED(2639, "You have exceeded the maximum allowed pending bookings", HttpStatus.BAD_REQUEST),
     BOOKING_CANNOT_APPROVE(2614, "Cannot approve booking in current status", HttpStatus.BAD_REQUEST),
     BOOKING_CANNOT_REJECT(2615, "Cannot reject booking in current status", HttpStatus.BAD_REQUEST),
     USER_ALREADY_BOOKED_IN_TIME_SLOT(2616, "User already has another booking in the selected time slot",
