@@ -10,9 +10,12 @@ import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.model.Slot;
 import iuh.labbooking.model.SlotBooking;
 import iuh.labbooking.model.User;
+import iuh.labbooking.model.ResearchGroup;
 import iuh.labbooking.repository.BookingRequestRepository;
 import iuh.labbooking.repository.SlotRepository;
 import iuh.labbooking.repository.UserRepository;
+import iuh.labbooking.repository.ResearchGroupRepository;
+import iuh.labbooking.repository.GroupMembershipRepository;
 import iuh.labbooking.service.booking.BookingCreationContext;
 import iuh.labbooking.service.booking.availability.DeviceAvailabilityService;
 import iuh.labbooking.service.booking.availability.RoomCapacityService;
@@ -42,6 +45,8 @@ public class BookingCreationValidator {
     private final BookingConflictQueryService conflictQueryService;
     private final DeviceAvailabilityService deviceAvailabilityService;
     private final RoomCapacityService roomCapacityService;
+    private final ResearchGroupRepository researchGroupRepository;
+    private final GroupMembershipRepository groupMembershipRepository;
 
     public BookingValidationResult validatePersonal(BookingCreationContext context) {
         BookingValidationResult result = newResult(context);
@@ -68,6 +73,33 @@ public class BookingCreationValidator {
         }
 
         Long researchGroupId = context.researchGroupIds().iterator().next();
+        ResearchGroup group = researchGroupRepository.findById(researchGroupId).orElse(null);
+        if (group == null) {
+            result.addError(ErrorCode.RESEARCH_GROUP_NOT_FOUND);
+            return result;
+        }
+
+        Long creatorId = group.getCreator() != null ? group.getCreator().getUserId() : null;
+        boolean isRequesterMember = context.requesterId().equals(creatorId) ||
+                groupMembershipRepository.existsByResearchGroup_ResearchGroupIdAndUser_UserId(researchGroupId, context.requesterId());
+
+        if (!isRequesterMember) {
+            result.addError(ErrorCode.NOT_GROUP_MEMBER);
+        }
+
+        for (var participant : context.participants()) {
+            boolean isParticipantMember = participant.userId().equals(creatorId) ||
+                    groupMembershipRepository.existsByResearchGroup_ResearchGroupIdAndUser_UserId(researchGroupId, participant.userId());
+            if (!isParticipantMember) {
+                result.addError(ErrorCode.NOT_GROUP_MEMBER);
+                break;
+            }
+        }
+
+        if (result.hasErrors()) {
+            return result;
+        }
+
         if (conflictQueryService.researchGroupHasActiveGroupBooking(
                 researchGroupId,
                 context.primaryDate(),
