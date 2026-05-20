@@ -35,8 +35,10 @@ import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
 import iuh.labbooking.service.researchgroup.ResearchGroupService;
 import iuh.labbooking.service.user.UserService;
 import iuh.labbooking.util.SecurityUtil;
+import iuh.labbooking.event.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -56,6 +58,7 @@ import java.util.stream.Collectors;
 public class BookingServiceImpl implements BookingService {
 
     private final BookingRequestRepository bookingRequestRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final SlotBookingRepository slotBookingRepository;
     private final BookingParticipantRepository bookingParticipantRepository;
     private final LabRoomRepository labRoomRepository;
@@ -106,7 +109,7 @@ public class BookingServiceImpl implements BookingService {
         BookingRequest bookingRequest = strategy.create(context, validationResult);
         strategy.afterCreated(bookingRequest, context);
 
-        // TODO: Publish booking notification event after transaction commit.
+        eventPublisher.publishEvent(new BookingCreatedEvent(bookingRequest.getBookingRequestId(), currentUserId));
 
         return bookingCreationResponseMapper.toResponse(bookingRequest, validationResult);
     }
@@ -369,6 +372,8 @@ public class BookingServiceImpl implements BookingService {
         saveBookingStatusHistory(booking, oldStatus, RequestStatus.CANCELED, StatusChangeReason.USER_CANCELED,
                 request != null ? request.cancelReason() : null, null);
 
+        eventPublisher.publishEvent(new BookingStatusChangedEvent(booking.getBookingRequestId(), oldStatus, RequestStatus.CANCELED, currentUser.getUserId()));
+
         return buildBookingResponse(booking, currentUser);
     }
     @Transactional
@@ -622,7 +627,7 @@ public class BookingServiceImpl implements BookingService {
 
         bookingSlotAttendanceRepository.saveAll(attendances);
 
-        // TODO: Publish event BOOKING_APPROVED for notification
+        eventPublisher.publishEvent(new BookingStatusChangedEvent(booking.getBookingRequestId(), oldStatus, RequestStatus.APPROVED, approver.getUserId()));
 
         log.info("Booking approved: ID={}, Attendance records created: {}",
                 bookingRequestId, attendances.size());
@@ -658,7 +663,7 @@ public class BookingServiceImpl implements BookingService {
         }
         bookingRequestRepository.save(booking);
 
-        // TODO: Publish event BOOKING_REJECTED for notification
+        eventPublisher.publishEvent(new BookingStatusChangedEvent(booking.getBookingRequestId(), oldStatus, RequestStatus.REJECTED, approver.getUserId()));
 
         log.info("Booking rejected: ID={}, Reason: {}", bookingRequestId, booking.getResponseNote());
 
@@ -704,6 +709,8 @@ public class BookingServiceImpl implements BookingService {
 
         saveBookingStatusHistory(booking, oldStatus, RequestStatus.SYSTEM_CANCELED, StatusChangeReason.OTHER,
                 note, null);
+
+        eventPublisher.publishEvent(new BookingStatusChangedEvent(booking.getBookingRequestId(), oldStatus, RequestStatus.SYSTEM_CANCELED, approver.getUserId()));
 
         return buildSecureBookingResponse(booking, approver);
     }
@@ -869,6 +876,12 @@ public class BookingServiceImpl implements BookingService {
             bookingSlotAttendanceRepository.saveAll(attendances);
             log.info("Created {} attendance records for new participants in booking {}",
                     attendances.size(), bookingRequestId);
+
+            eventPublisher.publishEvent(new ThesisParticipantAddedEvent(
+                    booking.getBookingRequestId(),
+                    newParticipants.stream().map(BookingParticipant::getBookingParticipantId).toList(),
+                    currentUser.getUserId()
+            ));
         }
 
         return buildBookingResponse(booking, currentUser);

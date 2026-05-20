@@ -6,7 +6,9 @@ import iuh.labbooking.model.BookingRequest;
 import iuh.labbooking.repository.BookingParticipantRepository;
 import iuh.labbooking.repository.BookingRequestRepository;
 import iuh.labbooking.service.booking.BookingHistoryService;
+import iuh.labbooking.event.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -23,6 +25,7 @@ public class ThesisOverrideService {
     private final BookingParticipantRepository bookingParticipantRepository;
     private final BookingHistoryService bookingHistoryService;
     private final iuh.labbooking.repository.BookingSlotAttendanceRepository bookingSlotAttendanceRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public void cancelConflictingPersonalAndGroupBookings(BookingRequest thesisBooking, LocalDate date, List<Long> slotIds) {
         List<BookingRequest> conflicts = conflictQueryService.findActivePersonalOrGroupBookingsInRoom(
@@ -66,14 +69,15 @@ public class ThesisOverrideService {
                     conflict.getResponseNote(),
                     thesisBooking.getBookingRequestId());
 
-            // TODO: Publish event BOOKING_CANCELLED_BY_THESIS for notification:
-            // - Recipients: requester of conflict booking, CONFIRMED/PENDING_CONFLICT_RESOLUTION participants of conflict booking
-
             updatedConflicts.add(conflict);
         }
 
         if (!updatedConflicts.isEmpty()) {
             bookingRequestRepository.saveAll(updatedConflicts);
+            List<Long> cancelledIds = updatedConflicts.stream()
+                    .map(BookingRequest::getBookingRequestId)
+                    .toList();
+            eventPublisher.publishEvent(new BookingCancelledByThesisEvent(thesisBooking.getBookingRequestId(), cancelledIds));
         }
     }
 }

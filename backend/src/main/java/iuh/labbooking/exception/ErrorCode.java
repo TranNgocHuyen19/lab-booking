@@ -177,7 +177,10 @@ public enum ErrorCode {
     SYSTEM_CONFIG_ALREADY_EXISTS(2801, "System configuration already exists", HttpStatus.CONFLICT),
     INVALID_SYSTEM_CONFIG_VALUE(2802, "Invalid system configuration value", HttpStatus.BAD_REQUEST),
     SYSTEM_CONFIG_UPDATE_FAILED(2803, "Failed to update system configuration", HttpStatus.INTERNAL_SERVER_ERROR),
-    NO_CHANGES_DETECTED(2804, "No changes detected", HttpStatus.BAD_REQUEST);
+    NO_CHANGES_DETECTED(2804, "No changes detected", HttpStatus.BAD_REQUEST),
+
+    // ==================== ENTITY: NOTIFICATION (2900-2999) ====================
+    NOTIFICATION_NOT_FOUND(2900, "Notification not found", HttpStatus.NOT_FOUND);
 
     private final int code;
     private final String message;

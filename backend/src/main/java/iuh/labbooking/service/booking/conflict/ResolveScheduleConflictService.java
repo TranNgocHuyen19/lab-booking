@@ -19,7 +19,9 @@ import iuh.labbooking.model.BookingSlotAttendance;
 import iuh.labbooking.model.AttendanceSystemConfig;
 import iuh.labbooking.enums.CheckinStatus;
 import iuh.labbooking.enums.CheckoutStatus;
+import iuh.labbooking.event.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,7 @@ public class ResolveScheduleConflictService {
     private final BookingHistoryService bookingHistoryService;
     private final BookingSlotAttendanceRepository bookingSlotAttendanceRepository;
     private final SystemConfigurationService configService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void resolveParticipantConflict(Long currentUserId, Long participantId, ResolveParticipantConflictRequest request) {
@@ -54,6 +57,12 @@ public class ResolveScheduleConflictService {
         if (request.action() == ScheduleConflictAction.KEEP_EXISTING_BOOKING) {
             participant.setStatus(ParticipantStatus.DECLINED);
             bookingParticipantRepository.save(participant);
+            eventPublisher.publishEvent(new ParticipantConflictResolvedEvent(
+                    groupBooking.getBookingRequestId(),
+                    participantId,
+                    currentUserId,
+                    request.action()
+            ));
             return;
         }
 
@@ -109,5 +118,12 @@ public class ResolveScheduleConflictService {
                 bookingSlotAttendanceRepository.save(attendance);
             }
         }
+
+        eventPublisher.publishEvent(new ParticipantConflictResolvedEvent(
+                groupBooking.getBookingRequestId(),
+                participantId,
+                currentUserId,
+                request.action()
+        ));
     }
 }
