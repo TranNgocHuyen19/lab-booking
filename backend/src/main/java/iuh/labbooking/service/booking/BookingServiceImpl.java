@@ -380,14 +380,12 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_A_PARTICIPANT));
 
         if (participant.getStatus() != ParticipantStatus.CONFIRMED
-                && participant.getStatus() != ParticipantStatus.INVITED
                 && participant.getStatus() != ParticipantStatus.PENDING_CONFLICT_RESOLUTION) {
             throw new AppException(ErrorCode.NOT_A_PARTICIPANT);
         }
 
         long activeCount = booking.getParticipants().stream()
                 .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED 
-                        || p.getStatus() == ParticipantStatus.INVITED 
                         || p.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION)
                 .count();
 
@@ -584,13 +582,6 @@ public class BookingServiceImpl implements BookingService {
         if (request != null && request.responseNote() != null) {
             booking.setResponseNote(request.responseNote());
         }
-
-        for (BookingParticipant participant : booking.getParticipants()) {
-            if (participant.getStatus() == ParticipantStatus.INVITED) {
-                participant.setStatus(ParticipantStatus.CONFIRMED);
-            }
-        }
-        bookingParticipantRepository.saveAll(booking.getParticipants());
 
         bookingRequestRepository.save(booking);
 
@@ -1237,10 +1228,8 @@ public class BookingServiceImpl implements BookingService {
         java.util.Set<SlotBooking> slotBookings = booking.getSlotBookings();
         List<RequestStatus> activeStatuses = BookingConflictQueryService.ACTIVE_BOOKING_STATUSES;
 
-        // 1. Room capacity check excluding this booking's participants
         long requestedSeats = booking.getParticipants().stream()
                 .filter(p -> p.getStatus() == ParticipantStatus.CONFIRMED 
-                        || p.getStatus() == ParticipantStatus.INVITED 
                         || p.getStatus() == ParticipantStatus.PENDING_CONFLICT_RESOLUTION)
                 .count();
 

@@ -7,6 +7,7 @@ import iuh.labbooking.dto.response.attendance.AttendanceStatusResponse;
 import iuh.labbooking.enums.CheckinStatus;
 import iuh.labbooking.enums.CheckoutStatus;
 import iuh.labbooking.enums.RequestStatus;
+import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.exception.AppException;
 import iuh.labbooking.exception.ErrorCode;
 import iuh.labbooking.mapper.AttendanceMapper;
@@ -39,6 +40,10 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         if (attendance.getBookingRequest().getStatus() != RequestStatus.APPROVED) {
             throw new AppException(ErrorCode.BOOKING_NOT_APPROVED);
+        }
+
+        if (attendance.getBookingParticipant().getStatus() != ParticipantStatus.CONFIRMED) {
+            throw new AppException(ErrorCode.NOT_A_PARTICIPANT);
         }
 
         if (attendance.getCheckinAt() != null) {
@@ -148,7 +153,9 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .findByBookingRequest_BookingRequestIdAndBookingParticipant_User(bookingId, user)
                 .orElse(null);
 
-        if (attendance == null || attendance.getBookingRequest().getStatus() != RequestStatus.APPROVED) {
+        if (attendance == null 
+                || attendance.getBookingRequest().getStatus() != RequestStatus.APPROVED
+                || attendance.getBookingParticipant().getStatus() != ParticipantStatus.CONFIRMED) {
             return AttendanceStatusResponse.builder()
                     .hasCheckedIn(false)
                     .hasCheckedOut(false)

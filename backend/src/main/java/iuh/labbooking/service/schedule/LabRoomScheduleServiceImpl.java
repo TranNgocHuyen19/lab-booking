@@ -35,7 +35,6 @@ public class LabRoomScheduleServiceImpl implements LabRoomScheduleService {
 
     private static final List<ParticipantStatus> OCCUPYING_PARTICIPANT_STATUSES = List.of(
             ParticipantStatus.CONFIRMED,
-            ParticipantStatus.INVITED,
             ParticipantStatus.PENDING_CONFLICT_RESOLUTION
     );
 

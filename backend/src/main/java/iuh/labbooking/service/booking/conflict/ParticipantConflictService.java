@@ -17,6 +17,6 @@ public class ParticipantConflictService {
         if (conflictQueryService.userHasActivePersonalBooking(userId, date, slotIds)) {
             return ParticipantStatus.PENDING_CONFLICT_RESOLUTION;
         }
-        return ParticipantStatus.INVITED;
+        return ParticipantStatus.CONFIRMED;
     }
 }

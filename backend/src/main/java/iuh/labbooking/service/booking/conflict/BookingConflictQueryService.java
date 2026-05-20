@@ -24,7 +24,6 @@ public class BookingConflictQueryService {
 
     public static final List<ParticipantStatus> OCCUPYING_PARTICIPANT_STATUSES = List.of(
             ParticipantStatus.CONFIRMED,
-            ParticipantStatus.INVITED,
             ParticipantStatus.PENDING_CONFLICT_RESOLUTION
     );
 
