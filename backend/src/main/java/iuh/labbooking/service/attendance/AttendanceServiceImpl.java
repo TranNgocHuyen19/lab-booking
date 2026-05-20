@@ -76,6 +76,8 @@ public class AttendanceServiceImpl implements AttendanceService {
             }
         }
 
+        verifyLocationAndSaveDistance(attendance, request.latitude(), request.longitude(), true);
+
         attendance.setCheckinAt(now);
         attendance.setCheckinStatus(status);
         attendance.setLateCheckinMinutes(lateMinutes);
@@ -125,6 +127,8 @@ public class AttendanceServiceImpl implements AttendanceService {
                 ));
             }
         }
+
+        verifyLocationAndSaveDistance(attendance, request.latitude(), request.longitude(), false);
 
         attendance.setCheckoutAt(now);
         attendance.setCheckoutStatus(status);
@@ -255,5 +259,39 @@ public class AttendanceServiceImpl implements AttendanceService {
             LocalDateTime start,
             LocalDateTime end
     ) {
+    }
+
+    private void verifyLocationAndSaveDistance(BookingSlotAttendance attendance, Double userLat, Double userLng, boolean isCheckin) {
+        LabRoom room = attendance.getBookingRequest().getLabRoom();
+        if (room != null && room.getLatitude() != null && room.getLongitude() != null) {
+            double distance = calculateDistance(userLat, userLng, room.getLatitude(), room.getLongitude());
+            AttendanceSystemConfig config = attendance.getAttendanceSystemConfig();
+            if (distance > config.getLabRadiusMeters()) {
+                throw new AppException(ErrorCode.TOO_FAR_FROM_LAB, Map.of(
+                        "distance", distance,
+                        "maxRadius", config.getLabRadiusMeters()
+                ));
+            }
+            if (isCheckin) {
+                attendance.setCheckinLat(userLat);
+                attendance.setCheckinLng(userLng);
+                attendance.setCheckinDistanceMeters(distance);
+            } else {
+                attendance.setCheckoutLat(userLat);
+                attendance.setCheckoutLng(userLng);
+                attendance.setCheckoutDistanceMeters(distance);
+            }
+        }
+    }
+
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371000; // Radius of the earth in meters
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
     }
 }
