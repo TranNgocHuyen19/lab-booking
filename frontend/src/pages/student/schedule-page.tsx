@@ -228,7 +228,8 @@ const StudentSchedulePage = () => {
                   {[
                     { color: 'bg-yellow-50 border-yellow-400', label: 'Đang chờ' },
                     { color: 'bg-green-50 border-green-500', label: 'Đã xác nhận' },
-                    { color: 'bg-gray-100 border-gray-400', label: 'Đã hủy / Bị từ chối' }
+                    { color: 'bg-gray-100 border-gray-400', label: 'Đã hủy' },
+                    { color: 'bg-red-50 border-red-500', label: 'Bị từ chối' }
                   ].map((item, i) => (
                     <div key={i} className='flex items-center gap-2'>
                       <span className={`w-5 h-5 rounded-sm border shadow-sm ${item.color}`}></span>

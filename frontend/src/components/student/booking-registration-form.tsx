@@ -21,7 +21,11 @@ import type { CreateBookingRequest } from '@/schemas/booking.schema'
 import type { SlotResponse } from '@/schemas/slot.schema'
 import type { UserResponse } from '@/schemas/user.schema'
 import type { ResearchGroupResponse, MemberInfoResponse } from '@/schemas/research-group.schema'
-import { handleBookingCreateError, showBookingCreateFeedback, getScheduleConflictDetails } from '@/utils/booking-create-feedback'
+import {
+  handleBookingCreateError,
+  showBookingCreateFeedback,
+  getScheduleConflictDetails
+} from '@/utils/booking-create-feedback'
 import type { BookingCreateWarningDialog } from '@/utils/booking-create-feedback'
 
 interface StudentBookingFormProps {
@@ -140,15 +144,15 @@ export const StudentBookingForm = ({
       }
       finishBookingCreation()
     } catch (error: unknown) {
-      const conflictDialog = getScheduleConflictDetails(error);
+      const conflictDialog = getScheduleConflictDetails(error)
       if (conflictDialog) {
         setWarningDialog({
           ...conflictDialog,
           onConfirm: () => handleSaveBooking(true)
-        });
-        return;
+        })
+        return
       }
-      handleBookingCreateError(error);
+      handleBookingCreateError(error)
     }
   }
 
@@ -490,6 +494,8 @@ export const StudentBookingForm = ({
           confirmLabel={warningDialog.confirmLabel}
           cancelLabel={warningDialog.cancelLabel}
           showCancel={warningDialog.showCancel ?? false}
+          closeOnConfirm={!warningDialog.onConfirm}
+          confirmLoading={createBookingMutation.isPending}
         />
       )}
     </>

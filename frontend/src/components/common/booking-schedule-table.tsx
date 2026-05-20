@@ -52,6 +52,7 @@ export const MyBookingScheduleTable = ({ weekDays, slots, bookings, isLecturerVi
       case 'APPROVED':
         return 'bg-green-50 border-green-500 text-green-800'
       case 'REJECTED':
+        return 'bg-red-50 border-red-500 text-red-800'
       case 'CANCELED':
       case 'SYSTEM_CANCELED':
         return 'bg-gray-100 border-gray-400 text-gray-800'

@@ -41,12 +41,23 @@ export const CreateBookingRequestSchema = z.object({
   participants: z.array(CreateBookingParticipantSchema).optional(),
   researchGroupIds: z.array(z.number()).optional(),
   devices: z.array(DeviceQuantityRequestSchema).optional(),
-  forceSwitch: z.boolean().optional(),
+  forceSwitch: z.boolean().optional()
 })
 
 export type CreateBookingRequest = z.infer<typeof CreateBookingRequestSchema>
 
-export const RequestStatusSchema = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CANCELED', 'SYSTEM_CANCELED', 'CANCELLED_BY_USER', 'CANCELLED_BY_ADMIN', 'CANCELLED_BY_PRIORITY_BOOKING', 'COMPLETED', 'EXPIRED'])
+export const RequestStatusSchema = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CANCELED',
+  'SYSTEM_CANCELED',
+  'CANCELLED_BY_USER',
+  'CANCELLED_BY_ADMIN',
+  'CANCELLED_BY_PRIORITY_BOOKING',
+  'COMPLETED',
+  'EXPIRED'
+])
 export const BookingParticipantResponseSchema = z.object({
   participantId: z.number().optional(),
   userId: z.number().optional(),
@@ -73,6 +84,13 @@ export const ParticipantConflictResponseSchema = z.object({
   message: z.string()
 })
 
+export const ConflictDeviceResponseSchema = z.object({
+  deviceId: z.number().nullable().optional(),
+  deviceName: z.string().nullable().optional(),
+  deviceType: z.string().nullable().optional(),
+  quantity: z.number().nullable().optional()
+})
+
 export const ExistingScheduleConflictResponseSchema = z.object({
   code: z.string().optional(),
   message: z.string().optional(),
@@ -87,6 +105,7 @@ export const ExistingScheduleConflictResponseSchema = z.object({
   slotName: z.string().nullable().optional(),
   startTime: z.string().nullable().optional(),
   endTime: z.string().nullable().optional(),
+  devices: z.array(ConflictDeviceResponseSchema).optional(),
   suggestedAction: z.string().nullable().optional()
 })
 
@@ -194,7 +213,7 @@ export const UpdateBookingRequestSchema = z.object({
   purpose: z.string().min(1, 'Vui lòng nhập mục đích').max(500),
   participants: z.array(AddParticipantRequestSchema).optional(),
   devices: z.array(DeviceQuantityRequestSchema).optional(),
-  force: z.boolean().optional(),
+  force: z.boolean().optional()
 })
 
 export type UpdateBookingRequest = z.infer<typeof UpdateBookingRequestSchema>
