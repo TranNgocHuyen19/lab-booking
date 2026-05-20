@@ -4,7 +4,12 @@ import iuh.labbooking.enums.BookingType;
 import iuh.labbooking.enums.ParticipantStatus;
 import iuh.labbooking.enums.ScheduleConflictAction;
 import iuh.labbooking.exception.ErrorCode;
+import iuh.labbooking.model.BookingSystemConfig;
+import iuh.labbooking.model.Slot;
+import iuh.labbooking.model.User;
 import iuh.labbooking.repository.BookingRequestRepository;
+import iuh.labbooking.repository.SlotRepository;
+import iuh.labbooking.repository.UserRepository;
 import iuh.labbooking.service.booking.BookingCreationContext;
 import iuh.labbooking.service.booking.availability.DeviceAvailabilityService;
 import iuh.labbooking.service.booking.availability.RoomCapacityService;
@@ -12,14 +17,23 @@ import iuh.labbooking.service.booking.conflict.BookingConflictQueryService;
 import iuh.labbooking.service.booking.validation.BookingValidationResult.BookingValidationError;
 import iuh.labbooking.service.booking.validation.BookingValidationResult.ExistingScheduleConflictResult;
 import iuh.labbooking.service.booking.validation.BookingValidationResult.ParticipantConflictResult;
+import iuh.labbooking.service.systemconfiguration.SystemConfigurationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class BookingCreationValidator {
 
     private final BookingRequestRepository bookingRequestRepository;
+    private final UserRepository userRepository;
+    private final SlotRepository slotRepository;
+    private final SystemConfigurationService systemConfigurationService;
     private final BookingConflictQueryService conflictQueryService;
     private final DeviceAvailabilityService deviceAvailabilityService;
     private final RoomCapacityService roomCapacityService;
@@ -83,7 +97,81 @@ public class BookingCreationValidator {
         if (context.hasDuplicatedSlots()) {
             result.addError(ErrorCode.DUPLICATED_SLOT_IN_REQUEST);
         }
+        addBookingConfigErrors(context, result);
         return result;
+    }
+
+    private void addBookingConfigErrors(BookingCreationContext context, BookingValidationResult result) {
+        User requester = userRepository.findById(context.requesterId()).orElse(null);
+        if (requester == null || requester.getRole() == null) {
+            result.addError(ErrorCode.USER_NOT_FOUND);
+            return;
+        }
+
+        BookingSystemConfig config = systemConfigurationService.getActiveBookingConfig();
+        String roleName = requester.getRole().getRoleName();
+        Integer maxAdvanceDays = maxAdvanceDaysForRole(roleName, config);
+        if (maxAdvanceDays == null || maxAdvanceDays <= 0) {
+            result.addError(ErrorCode.BOOKING_ROLE_NOT_ALLOWED);
+            return;
+        }
+
+        Integer minMinutesToBook = minMinutesToBookForRole(roleName, config);
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (var slotCommand : context.slots()) {
+            long daysAhead = Duration.between(
+                    today.atStartOfDay(),
+                    slotCommand.bookingDate().atStartOfDay()).toDays();
+            if (daysAhead > maxAdvanceDays) {
+                result.addError(ErrorCode.BOOKING_TOO_FAR_IN_ADVANCE);
+            }
+        }
+
+        if (minMinutesToBook == null) {
+            return;
+        }
+
+        List<Slot> slots = slotRepository.findAllById(context.slotIds());
+        if (slots.size() != context.slotIds().stream().distinct().count()) {
+            result.addError(ErrorCode.SLOT_NOT_FOUND);
+            return;
+        }
+
+        for (var slotCommand : context.slots()) {
+            Slot slot = slots.stream()
+                    .filter(s -> s.getSlotId().equals(slotCommand.slotId()))
+                    .findFirst()
+                    .orElse(null);
+            if (slot == null) {
+                result.addError(ErrorCode.SLOT_NOT_FOUND);
+                continue;
+            }
+
+            LocalDateTime startTime = LocalDateTime.of(slotCommand.bookingDate(), slot.getStartTime());
+            long minutesUntilStart = Duration.between(now, startTime).toMinutes();
+            if (minutesUntilStart < minMinutesToBook) {
+                result.addError(ErrorCode.BOOKING_CREATION_TIME_INVALID);
+            }
+        }
+    }
+
+    private Integer maxAdvanceDaysForRole(String roleName, BookingSystemConfig config) {
+        return switch (roleName) {
+            case "STUDENT" -> config.getStudentAdvanceDays();
+            case "LECTURER" -> config.getLecturerAdvanceDays();
+            case "ADMIN" -> config.getAdminAdvanceDays();
+            default -> null;
+        };
+    }
+
+    private Integer minMinutesToBookForRole(String roleName, BookingSystemConfig config) {
+        return switch (roleName) {
+            case "STUDENT" -> config.getStudentMinMinutesToBook();
+            case "LECTURER" -> config.getLecturerMinMinutesToBook();
+            default -> null;
+        };
     }
 
     private void addPersonalExistingScheduleConflicts(

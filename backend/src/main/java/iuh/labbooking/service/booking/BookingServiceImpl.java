@@ -88,16 +88,16 @@ public class BookingServiceImpl implements BookingService {
         BookingCreationStrategy strategy = bookingStrategyFactory.getStrategy(context.bookingType());
         BookingValidationResult validationResult = strategy.validate(context);
 
+        if (validationResult.hasErrors()) {
+            throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
+        }
+
         if (!validationResult.existingScheduleConflicts().isEmpty()) {
             if (context.forceSwitch()) {
                 cancelOrLeaveConflictingBookings(currentUserId, validationResult.existingScheduleConflicts());
             } else {
                 throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
             }
-        }
-
-        if (validationResult.hasErrors()) {
-            throw new AppException(ErrorCode.BOOKING_VALIDATION_FAILED, validationResult);
         }
 
         BookingRequest bookingRequest = strategy.create(context, validationResult);
